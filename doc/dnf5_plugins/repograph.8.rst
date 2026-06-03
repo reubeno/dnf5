@@ -229,6 +229,52 @@ Examples
       visualization).
 
 
+Rendering Recipes
+=================
+
+The plugin emits portable Graphviz dot. Different layout engines and
+attributes suit different graph sizes and use cases. The plugin does
+not bake any layout decisions into its output; the recipes below are
+recommendations only.
+
+**Small targeted graphs** (a handful of packages, e.g. a single SPEC
+and its direct deps): the default ``dot`` engine with no tweaks is
+usually fine.
+
+::
+
+    dnf5 repograph bash | dot -Tsvg -o bash.svg
+
+**Medium graphs** (50–200 packages, e.g. a container image manifest
+under ``--closed``): the default ``dot`` engine still works well, but
+benefits from generous rank/node separation and rounded boxes for a
+**wide, browseable** layout. Pan/zoom in your viewer:
+
+::
+
+    dnf5 repograph --closed --edge-style=by-kind $(cat nevras.txt) \
+      | sed '1a\
+            graph [rankdir=TB,ranksep=2.5,nodesep=0.8,concentrate=true];\
+            node [fontsize=14,shape=box,style=rounded];' \
+      | dot -Tsvg -o image.svg
+
+**Large graphs** (hundreds to thousands of packages, e.g.
+repo-wide): hierarchical layouts blow up; switch to a force-directed
+engine such as ``sfdp`` or ``neato``:
+
+::
+
+    dnf5 repograph --use-system | sfdp -Tsvg -o system.svg
+
+For very large outputs, prefer ``--format=json`` and post-process with
+a graph library (e.g. ``networkx``) rather than rendering directly.
+
+**Telling weak deps apart** without re-introducing labels: combine
+``--edge-style=by-kind`` (weak edges dashed/dimmed) with the default
+``--edge-label=none``. The structural information is preserved in the
+visual style.
+
+
 JSON Output
 ===========
 
