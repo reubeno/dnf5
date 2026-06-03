@@ -43,11 +43,16 @@ namespace dnf5 {
 enum class RepographMode {
     /// Walk every package in the selected available repos.
     REPO_WIDE,
-    /// Roots from positional specs, universe from available repos (open).
+    /// Roots from positional specs, universe from available repos (open
+    /// closure via the solver).
     TARGETED,
+    /// Roots from positional specs, universe is exactly the resolved
+    /// spec set (no closure expansion). Selected via `--closed`.
+    SPECS_CLOSED,
     /// Roots and universe from the installed system (closed).
     CLOSED_SET,
-    /// Roots from positional specs, universe from the installed system (closed).
+    /// Roots from positional specs, universe from the installed system
+    /// (closed).
     TARGETED_CLOSED,
 };
 
@@ -72,9 +77,9 @@ private:
     // ---- Resolved/derived state computed in configure() and consumed by run().
     RepographMode mode{RepographMode::REPO_WIDE};
     RepographFormat format{RepographFormat::DOT};
-    repograph::ProviderPolicy provider_policy{repograph::ProviderPolicy::SOLVER};
-    repograph::NodeIdPolicy node_id_policy{repograph::NodeIdPolicy::NEVRA};
-    repograph::EdgeAnnotations edge_annotations{repograph::EdgeAnnotations::BOTH};
+    repograph::ProviderPolicy resolver{repograph::ProviderPolicy::SOLVER};
+    repograph::NodeIdPolicy node_label_policy{repograph::NodeIdPolicy::NAME};
+    repograph::EdgeAnnotations edge_label{repograph::EdgeAnnotations::NONE};
     bool include_reverse_weak{false};
     bool include_weak_deps{true};
     std::string output_path;
@@ -82,10 +87,11 @@ private:
     // ---- Raw CLI input.
     std::vector<std::string> pkg_specs;
     libdnf5::OptionBool * use_system_option{nullptr};
+    libdnf5::OptionBool * closed_option{nullptr};
     libdnf5::OptionBool * include_reverse_weak_option{nullptr};
-    libdnf5::OptionEnum * provider_policy_option{nullptr};
-    libdnf5::OptionEnum * node_id_option{nullptr};
-    libdnf5::OptionEnum * edge_annotations_option{nullptr};
+    libdnf5::OptionEnum * resolver_option{nullptr};
+    libdnf5::OptionEnum * node_label_option{nullptr};
+    libdnf5::OptionEnum * edge_label_option{nullptr};
     libdnf5::OptionEnum * format_option{nullptr};
     libdnf5::OptionPath * output_option{nullptr};
 };

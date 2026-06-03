@@ -89,12 +89,12 @@ void emit_json(
     std::ostream & out,
     const Graph & graph,
     const std::string & mode_name,
-    const std::string & node_id_policy_name,
-    const std::string & provider_policy_name) {
+    const std::string & node_label_policy_name,
+    const std::string & resolver_name) {
     json_object * root = json_object_new_object();
     json_object_object_add(root, "mode", json_object_new_string(mode_name.c_str()));
-    json_object_object_add(root, "node_id_policy", json_object_new_string(node_id_policy_name.c_str()));
-    json_object_object_add(root, "provider_policy", json_object_new_string(provider_policy_name.c_str()));
+    json_object_object_add(root, "node_label_policy", json_object_new_string(node_label_policy_name.c_str()));
+    json_object_object_add(root, "resolver", json_object_new_string(resolver_name.c_str()));
 
     json_object * nodes = json_object_new_array();
     for (const auto & n : graph.nodes) {

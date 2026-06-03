@@ -64,8 +64,6 @@ std::string display_id(const libdnf5::rpm::Package & pkg, NodeIdPolicy policy) {
             return pkg.get_nevra();
         case NodeIdPolicy::NAME:
             return pkg.get_name();
-        case NodeIdPolicy::NAME_ARCH:
-            return pkg.get_name() + "." + pkg.get_arch();
     }
     return pkg.get_nevra();
 }

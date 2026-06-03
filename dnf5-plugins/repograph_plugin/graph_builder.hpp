@@ -72,7 +72,6 @@ enum class ProviderPolicy {
 enum class NodeIdPolicy {
     NEVRA,        ///< name-epoch-version-release.arch (no merging)
     NAME,         ///< name (collapses across arches and EVRs)
-    NAME_ARCH,    ///< name.arch (collapses across EVRs)
 };
 
 
@@ -153,7 +152,7 @@ struct BuilderConfig {
     bool have_solver_set{false};
 
     ProviderPolicy provider_policy{ProviderPolicy::SOLVER};
-    NodeIdPolicy node_id_policy{NodeIdPolicy::NEVRA};
+    NodeIdPolicy node_id_policy{NodeIdPolicy::NAME};
     bool include_weak_deps{true};
     bool include_reverse_weak{false};
 

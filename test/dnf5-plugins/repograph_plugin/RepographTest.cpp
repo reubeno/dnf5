@@ -103,10 +103,11 @@ void RepographTest::test_all_options_registered() {
 
     // Each of these throws if the arg isn't registered.
     (void)cp.get_named_arg("use-system");
+    (void)cp.get_named_arg("closed");
     (void)cp.get_named_arg("include-reverse-weak");
-    (void)cp.get_named_arg("provider-policy");
-    (void)cp.get_named_arg("node-id");
-    (void)cp.get_named_arg("edge-annotations");
+    (void)cp.get_named_arg("resolver");
+    (void)cp.get_named_arg("node-label");
+    (void)cp.get_named_arg("edge-label");
     (void)cp.get_named_arg("format");
     (void)cp.get_named_arg("output");
     (void)cp.get_named_arg("json");
@@ -122,6 +123,16 @@ void RepographTest::test_use_system_option() {
 }
 
 
+void RepographTest::test_closed_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("closed");
+    CPPUNIT_ASSERT_EQUAL(std::string("closed"), arg.get_long_name());
+    std::string desc = arg.get_description();
+    CPPUNIT_ASSERT(desc.find("SPEC") != std::string::npos);
+    CPPUNIT_ASSERT(desc.find("--use-system") != std::string::npos);
+}
+
+
 void RepographTest::test_include_reverse_weak_option() {
     Fixture f;
     auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("include-reverse-weak");
@@ -131,26 +142,26 @@ void RepographTest::test_include_reverse_weak_option() {
 }
 
 
-void RepographTest::test_provider_policy_option() {
+void RepographTest::test_resolver_option() {
     Fixture f;
-    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("provider-policy");
-    CPPUNIT_ASSERT_EQUAL(std::string("provider-policy"), arg.get_long_name());
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("resolver");
+    CPPUNIT_ASSERT_EQUAL(std::string("resolver"), arg.get_long_name());
     CPPUNIT_ASSERT(arg.get_has_value());
 }
 
 
-void RepographTest::test_node_id_option() {
+void RepographTest::test_node_label_option() {
     Fixture f;
-    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("node-id");
-    CPPUNIT_ASSERT_EQUAL(std::string("node-id"), arg.get_long_name());
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("node-label");
+    CPPUNIT_ASSERT_EQUAL(std::string("node-label"), arg.get_long_name());
     CPPUNIT_ASSERT(arg.get_has_value());
 }
 
 
-void RepographTest::test_edge_annotations_option() {
+void RepographTest::test_edge_label_option() {
     Fixture f;
-    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-annotations");
-    CPPUNIT_ASSERT_EQUAL(std::string("edge-annotations"), arg.get_long_name());
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-label");
+    CPPUNIT_ASSERT_EQUAL(std::string("edge-label"), arg.get_long_name());
     CPPUNIT_ASSERT(arg.get_has_value());
 }
 
@@ -182,6 +193,18 @@ void RepographTest::test_specs_positional() {
     Fixture f;
     auto & arg = f.cmd->get_argument_parser_command()->get_positional_arg("specs");
     CPPUNIT_ASSERT(!arg.get_description().empty());
+}
+
+
+void RepographTest::test_default_markers_in_help() {
+    Fixture f;
+    auto & cp = *f.cmd->get_argument_parser_command();
+    // dnf5 marks defaults inline in the description text. Verify our
+    // enum-valued options follow that convention.
+    CPPUNIT_ASSERT(cp.get_named_arg("resolver").get_description().find("default: solver") != std::string::npos);
+    CPPUNIT_ASSERT(cp.get_named_arg("node-label").get_description().find("default: name") != std::string::npos);
+    CPPUNIT_ASSERT(cp.get_named_arg("edge-label").get_description().find("default: none") != std::string::npos);
+    CPPUNIT_ASSERT(cp.get_named_arg("format").get_description().find("default: dot") != std::string::npos);
 }
 
 

@@ -38,11 +38,12 @@ The ``repograph`` command emits the package **dependency graph** in
 document. It is the dnf5 successor to the dnf4 ``repograph`` /
 ``repo-graph`` plugin, with several significant extensions:
 
-* Three modes of operation: walk an entire repo (the historical
+* Multiple modes of operation: walk an entire repo (the historical
   behavior), compute a focused dependency closure from one or more
-  *root* package specs, or analyze the dependency graph *within* the
-  set of currently installed packages.
-* Full per-reldep edge annotations distinguishing regular requires,
+  *root* package specs, restrict the universe to an explicit set of
+  packages, or analyze the dependency graph *within* the set of
+  currently installed packages.
+* Full per-reldep edge data distinguishing regular requires,
   ``Requires(pre)``, ``Recommends``, ``Suggests``, and (with
   ``--include-reverse-weak``) ``Supplements``/``Enhances``.
 * Honors the dnf5 ``install_weak_deps`` configuration option (so
@@ -58,10 +59,10 @@ Modes
 =====
 
 The mode is selected automatically from the combination of positional
-``<pkg-spec>`` arguments and the ``--use-system`` option:
+``<pkg-spec>`` arguments, ``--use-system``, and ``--closed``:
 
 .. list-table::
-   :widths: 25 40 35
+   :widths: 30 30 40
    :header-rows: 1
 
    * - Command line
@@ -75,26 +76,40 @@ The mode is selected automatically from the combination of positional
      - Targeted (solver-driven)
      - Runs the libdnf5 dependency solver to compute the transitive
        closure of the specs, then graphs the resulting set.
+   * - ``dnf5 repograph --closed <spec>...``
+     - Specs-closed
+     - Universe is exactly the resolved SPEC set. No closure expansion.
+       Edges are only drawn between SPECs that satisfy one another's
+       deps. Useful for "what are the internal dependencies of this
+       set of packages?"
    * - ``dnf5 repograph --use-system``
      - Closed-set
      - Roots and universe are both taken from the currently installed
        packages. Edges are drawn between packages in the installed set.
    * - ``dnf5 repograph --use-system <spec>...``
-     - Targeted-in-closed
+     - Targeted-closed
      - Roots come from the specs (resolved against the installed sack);
-       the universe is the closed installed set. Useful for asking
-       "what does the installed system look like, starting from these
-       packages?"
+       the universe is the closed installed set. Useful for "what does
+       the installed system look like, starting from these packages?"
 
 
 Options
 =======
 
+Defaults are noted inline. All flags also appear in ``dnf5 repograph
+--help``.
+
 ``--use-system``
     | Use installed packages as the graph universe. With no SPECs,
       the universe also defines the root set (closed-set mode). With
       SPECs, roots come from the SPECs and are resolved against the
-      installed sack.
+      installed sack. Mutually exclusive with ``--closed``.
+
+``--closed``
+    | Treat the positional SPECs as the entire universe: no closure
+      expansion, no solver. Requires one or more SPECs. Mutually
+      exclusive with ``--use-system``. Specs are resolved against the
+      available repos.
 
 ``--include-reverse-weak``
     | Also draw edges derived from ``Supplements`` and ``Enhances``
@@ -104,12 +119,12 @@ Options
       conditions) are skipped with a stderr warning; the JSON output
       includes a ``"skipped":true`` marker in that case.
 
-``--provider-policy=solver|first|best|all|or-node``
-    | How to pick a target when a single reldep has multiple
-      satisfiers.
-    | ``solver`` *(default)* — for targeted mode, prefer satisfiers
-      that the solver actually included in the resolved set; in other
-      modes silently fall back to ``best``. Explicitly requesting
+``--resolver=solver|first|best|all|or-node`` (default: ``solver``)
+    | How to resolve which provider to draw an edge to when multiple
+      packages satisfy a dep.
+    | ``solver`` — for targeted mode, prefer satisfiers that the
+      solver actually included in the resolved set; in other modes
+      silently fall back to ``best``. Explicitly requesting
       ``solver`` outside a targeted mode is an error.
     | ``first`` — pick the first satisfier in stable id order. This
       matches the behavior of the dnf4 Python plugin.
@@ -121,29 +136,27 @@ Options
       fans out to all satisfiers. Useful for human-readable
       visualization of disjunctive dependencies.
 
-``--node-id=nevra|name|name.arch``
-    | Display identifier for graph nodes. Also controls node *merging*:
-      with ``name`` or ``name.arch``, multiple package variants
-      collapse into one node and their NEVRAs appear in the
-      ``members`` array in JSON output.
-    | ``nevra`` *(default)* — full ``name-epoch-version-release.arch``;
-      no merging.
-    | ``name`` — package name only; collapses across arches and EVRs.
-    | ``name.arch`` — name and arch; collapses across EVRs.
+``--node-label=nevra|name`` (default: ``name``)
+    | Label used to identify graph nodes. Also controls node
+      **merging**.
+    | ``nevra`` — full ``name-epoch-version-release.arch``; no
+      merging.
+    | ``name`` — package name only; multiple package variants
+      (different arches or EVRs) collapse into one node. JSON output
+      records the underlying NEVRAs in a ``members`` array.
 
-``--edge-annotations=both|reldep|kind|none``
+``--edge-label=none|reldep|kind|both`` (default: ``none``)
     | What text to render on dot edge labels. Does **not** affect
       JSON output, which always contains the full structured reldep
       list per edge.
-    | ``both`` *(default)* — ``kind:reldep`` per entry, comma-joined.
+    | ``none`` — no edge labels (keeps large graphs readable).
     | ``reldep`` — just the reldep string.
     | ``kind`` — just the dependency kind tag.
-    | ``none`` — no edge labels.
+    | ``both`` — ``kind:reldep`` per entry, comma-joined.
 
-``--format=dot|json``
-    | Output format. ``dot`` is the default.
-    | If both ``--format=dot`` and ``--json`` are passed, the command
-      errors out.
+``--format=dot|json`` (default: ``dot``)
+    | Output format. If both ``--format=dot`` and ``--json`` are
+      passed, the command errors out.
 
 ``--json``
     | Shortcut for ``--format=json``. This is the standard
@@ -154,7 +167,8 @@ Options
 
 ``<pkg-spec>``
     | One or more package specs (NEVRA, glob, file path, provides) to
-      use as graph roots. Optional.
+      use as graph roots. Optional in repo-wide and closed-set modes;
+      required in targeted, specs-closed, and targeted-closed modes.
 
 Standard dnf5 options are honored, including ``--repo``,
 ``--enable-repo``, ``--disable-repo``, ``--setopt``,
@@ -168,9 +182,12 @@ Examples
 
 ``dnf5 repograph bash``
     | Compute the dependency closure of ``bash`` and print it as a dot
-      graph. Each node corresponds to one NEVRA in the resolved
-      transaction; each edge is annotated with the reldep(s) that
-      caused it and their kind.
+      graph. Default ``--node-label=name`` collapses arches/versions;
+      default ``--edge-label=none`` keeps the graph compact.
+
+``dnf5 repograph --closed bash glibc filesystem``
+    | Draw only the internal dependency edges among the three SPECs;
+      no further packages are included.
 
 ``dnf5 repograph --json bash | jq '.nodes | length'``
     | Count nodes in the closure of ``bash``.
@@ -182,11 +199,12 @@ Examples
     | Graph the dependency closure of ``bash`` restricted to packages
       that are already installed on this system.
 
-``dnf5 repograph --node-id=name --setopt install_weak_deps=False httpd``
-    | Compute the strong-only closure of ``httpd`` and collapse
-      multiple arches/versions of each package into a single node.
+``dnf5 repograph --node-label=nevra --edge-label=both httpd``
+    | Compute the closure of ``httpd``, render NEVRA-precise nodes,
+      and annotate each edge with both the dep kind and the reldep
+      string.
 
-``dnf5 repograph --provider-policy=or-node bash``
+``dnf5 repograph --resolver=or-node bash``
     | Render the closure of ``bash`` with disjunctive dependencies
       shown as virtual "or" nodes (helpful for diagnostic
       visualization).
@@ -202,17 +220,17 @@ The command returns a single JSON object with the following top-level
 fields:
 
 - ``mode`` (string) — one of ``"repo-wide"``, ``"targeted"``,
-  ``"closed-set"``, ``"targeted-closed"``.
-- ``node_id_policy`` (string) — the active ``--node-id`` setting.
-- ``provider_policy`` (string) — the active ``--provider-policy``
+  ``"specs-closed"``, ``"closed-set"``, ``"targeted-closed"``.
+- ``node_label_policy`` (string) — the active ``--node-label``
   setting.
+- ``resolver`` (string) — the active ``--resolver`` setting.
 - ``nodes`` (array) — graph nodes (see below). Sorted by ``id``.
 - ``edges`` (array) — graph edges (see below). Sorted by
   ``(from, to)``.
 
 Each **node** object contains:
 
-- ``id`` (string) — display identifier per ``node_id_policy``.
+- ``id`` (string) — display identifier per ``node_label_policy``.
 - ``name`` (string) — RPM name.
 - ``epoch`` (string, optional) — RPM epoch (omitted when empty).
 - ``version`` (string)
@@ -225,9 +243,9 @@ Each **node** object contains:
   one of the libdnf5 transaction-item-reason values (e.g. ``User``,
   ``Dependency``, ``WeakDependency``).
 - ``members`` (array of strings, optional) — only present when
-  ``node_id_policy`` is ``name`` or ``name.arch`` and more than one
-  underlying NEVRA collapsed into this node. Lists those NEVRAs so
-  synthetic name-collision self-loops remain diagnosable.
+  ``node_label_policy`` is ``name`` and more than one underlying
+  NEVRA collapsed into this node. Lists those NEVRAs so synthetic
+  name-collision self-loops remain diagnosable.
 
 Each **edge** object contains:
 
@@ -241,7 +259,7 @@ Each **edge** object contains:
   - ``kind`` (string) — one of ``regular``, ``requires-pre``,
     ``recommends``, ``suggests``, ``supplemented-by``, ``enhanced-by``.
   - ``alt`` (boolean, optional) — ``true`` if this entry was
-    selected as an alternative under ``--provider-policy=all``.
+    selected as an alternative under ``--resolver=all``.
   - ``skipped`` (boolean, optional) — ``true`` if this reldep was
     skipped (currently only used for rich reverse-weak deps under
     ``--include-reverse-weak``). ``reason`` carries an explanation.

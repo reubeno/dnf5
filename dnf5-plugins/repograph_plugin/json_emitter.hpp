@@ -32,14 +32,14 @@ namespace dnf5::repograph {
 
 
 /// Stream the graph as a JSON document to `out`. The top-level fields
-/// `mode`, `node_id_policy`, and `provider_policy` describe how the
-/// graph was produced.
+/// `mode`, `node_label_policy`, and `resolver` describe how the graph
+/// was produced.
 void emit_json(
     std::ostream & out,
     const Graph & graph,
     const std::string & mode_name,
-    const std::string & node_id_policy_name,
-    const std::string & provider_policy_name);
+    const std::string & node_label_policy_name,
+    const std::string & resolver_name);
 
 
 }  // namespace dnf5::repograph
