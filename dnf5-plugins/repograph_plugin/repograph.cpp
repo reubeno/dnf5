@@ -1,0 +1,484 @@
+// Copyright Contributors to the DNF5 project.
+// Copyright Contributors to the libdnf project.
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// This file is part of libdnf: https://github.com/rpm-software-management/libdnf/
+//
+// Libdnf is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
+// (at your option) any later version.
+//
+// Libdnf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
+
+#include "repograph.hpp"
+
+#include "dot_emitter.hpp"
+#include "json_emitter.hpp"
+
+#include <libdnf5-cli/argument_parser.hpp>
+#include <libdnf5-cli/exception.hpp>
+#include <libdnf5/base/goal.hpp>
+#include <libdnf5/conf/const.hpp>
+#include <libdnf5/conf/option_enum.hpp>
+#include <libdnf5/rpm/package_query.hpp>
+#include <libdnf5/transaction/transaction_item_reason.hpp>
+#include <libdnf5/utils/bgettext/bgettext-mark-domain.h>
+#include <libdnf5/utils/format.hpp>
+
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+
+
+namespace dnf5 {
+
+
+namespace {
+
+
+constexpr const char * PROVIDER_POLICY_SOLVER = "solver";
+constexpr const char * PROVIDER_POLICY_FIRST = "first";
+constexpr const char * PROVIDER_POLICY_BEST = "best";
+constexpr const char * PROVIDER_POLICY_ALL = "all";
+constexpr const char * PROVIDER_POLICY_OR_NODE = "or-node";
+
+constexpr const char * NODE_ID_NEVRA = "nevra";
+constexpr const char * NODE_ID_NAME = "name";
+constexpr const char * NODE_ID_NAME_ARCH = "name.arch";
+
+constexpr const char * EDGE_ANNOT_BOTH = "both";
+constexpr const char * EDGE_ANNOT_RELDEP = "reldep";
+constexpr const char * EDGE_ANNOT_KIND = "kind";
+constexpr const char * EDGE_ANNOT_NONE = "none";
+
+constexpr const char * FORMAT_DOT = "dot";
+constexpr const char * FORMAT_JSON = "json";
+
+
+std::string mode_to_string(RepographMode mode) {
+    switch (mode) {
+        case RepographMode::REPO_WIDE:
+            return "repo-wide";
+        case RepographMode::TARGETED:
+            return "targeted";
+        case RepographMode::CLOSED_SET:
+            return "closed-set";
+        case RepographMode::TARGETED_CLOSED:
+            return "targeted-closed";
+    }
+    return "unknown";
+}
+
+
+repograph::ProviderPolicy parse_provider_policy(const std::string & s) {
+    if (s == PROVIDER_POLICY_SOLVER)
+        return repograph::ProviderPolicy::SOLVER;
+    if (s == PROVIDER_POLICY_FIRST)
+        return repograph::ProviderPolicy::FIRST;
+    if (s == PROVIDER_POLICY_BEST)
+        return repograph::ProviderPolicy::BEST;
+    if (s == PROVIDER_POLICY_ALL)
+        return repograph::ProviderPolicy::ALL;
+    if (s == PROVIDER_POLICY_OR_NODE)
+        return repograph::ProviderPolicy::OR_NODE;
+    throw std::runtime_error("invalid provider-policy: " + s);
+}
+
+
+repograph::NodeIdPolicy parse_node_id_policy(const std::string & s) {
+    if (s == NODE_ID_NEVRA)
+        return repograph::NodeIdPolicy::NEVRA;
+    if (s == NODE_ID_NAME)
+        return repograph::NodeIdPolicy::NAME;
+    if (s == NODE_ID_NAME_ARCH)
+        return repograph::NodeIdPolicy::NAME_ARCH;
+    throw std::runtime_error("invalid node-id: " + s);
+}
+
+
+repograph::EdgeAnnotations parse_edge_annotations(const std::string & s) {
+    if (s == EDGE_ANNOT_BOTH)
+        return repograph::EdgeAnnotations::BOTH;
+    if (s == EDGE_ANNOT_RELDEP)
+        return repograph::EdgeAnnotations::RELDEP;
+    if (s == EDGE_ANNOT_KIND)
+        return repograph::EdgeAnnotations::KIND;
+    if (s == EDGE_ANNOT_NONE)
+        return repograph::EdgeAnnotations::NONE;
+    throw std::runtime_error("invalid edge-annotations: " + s);
+}
+
+
+}  // namespace
+
+
+void RepographCommand::set_parent_command() {
+    auto * arg_parser_parent_cmd = get_session().get_argument_parser().get_root_command();
+    auto * arg_parser_this_cmd = get_argument_parser_command();
+    arg_parser_parent_cmd->register_command(arg_parser_this_cmd);
+}
+
+
+void RepographCommand::set_argument_parser() {
+    auto & ctx = get_context();
+    auto & parser = ctx.get_argument_parser();
+    auto & cmd = *get_argument_parser_command();
+
+    cmd.set_description(_("Emit the package dependency graph in dot or JSON format"));
+
+    auto * specs = parser.add_new_positional_arg(
+        "specs", libdnf5::cli::ArgumentParser::PositionalArg::UNLIMITED, nullptr, nullptr);
+    specs->set_description(_("Root package specs whose dependency closure will be graphed"));
+    specs->set_parse_hook_func(
+        [this](
+            [[maybe_unused]] libdnf5::cli::ArgumentParser::PositionalArg * arg, int argc, const char * const argv[]) {
+            for (int i = 0; i < argc; ++i) {
+                pkg_specs.emplace_back(argv[i]);
+            }
+            return true;
+        });
+    cmd.register_positional_arg(specs);
+
+    use_system_option =
+        dynamic_cast<libdnf5::OptionBool *>(parser.add_init_value(std::make_unique<libdnf5::OptionBool>(false)));
+    auto * use_system_arg = parser.add_new_named_arg("use-system");
+    use_system_arg->set_long_name("use-system");
+    use_system_arg->set_description(
+        _("Use installed packages as the graph universe (and as roots when no SPEC is given)"));
+    use_system_arg->set_const_value("true");
+    use_system_arg->link_value(use_system_option);
+    cmd.register_named_arg(use_system_arg);
+
+    include_reverse_weak_option =
+        dynamic_cast<libdnf5::OptionBool *>(parser.add_init_value(std::make_unique<libdnf5::OptionBool>(false)));
+    auto * include_reverse_weak_arg = parser.add_new_named_arg("include-reverse-weak");
+    include_reverse_weak_arg->set_long_name("include-reverse-weak");
+    include_reverse_weak_arg->set_description(
+        _("Also draw edges derived from Supplements/Enhances (direction-corrected)"));
+    include_reverse_weak_arg->set_const_value("true");
+    include_reverse_weak_arg->link_value(include_reverse_weak_option);
+    cmd.register_named_arg(include_reverse_weak_arg);
+
+    provider_policy_option =
+        dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
+            std::make_unique<libdnf5::OptionEnum>(
+                PROVIDER_POLICY_SOLVER,
+                std::vector<std::string>{
+                    PROVIDER_POLICY_SOLVER,
+                    PROVIDER_POLICY_FIRST,
+                    PROVIDER_POLICY_BEST,
+                    PROVIDER_POLICY_ALL,
+                    PROVIDER_POLICY_OR_NODE})));
+    auto * provider_policy_arg = parser.add_new_named_arg("provider-policy");
+    provider_policy_arg->set_long_name("provider-policy");
+    provider_policy_arg->set_description(_("How to choose a provider when multiple packages satisfy a dep"));
+    provider_policy_arg->set_has_value(true);
+    provider_policy_arg->set_arg_value_help("solver|first|best|all|or-node");
+    provider_policy_arg->link_value(provider_policy_option);
+    cmd.register_named_arg(provider_policy_arg);
+
+    node_id_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionEnum>(
+            NODE_ID_NEVRA, std::vector<std::string>{NODE_ID_NEVRA, NODE_ID_NAME, NODE_ID_NAME_ARCH})));
+    auto * node_id_arg = parser.add_new_named_arg("node-id");
+    node_id_arg->set_long_name("node-id");
+    node_id_arg->set_description(_("Display identifier for graph nodes (also controls node merging)"));
+    node_id_arg->set_has_value(true);
+    node_id_arg->set_arg_value_help("nevra|name|name.arch");
+    node_id_arg->link_value(node_id_option);
+    cmd.register_named_arg(node_id_arg);
+
+    edge_annotations_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionEnum>(
+            EDGE_ANNOT_BOTH,
+            std::vector<std::string>{EDGE_ANNOT_BOTH, EDGE_ANNOT_RELDEP, EDGE_ANNOT_KIND, EDGE_ANNOT_NONE})));
+    auto * edge_annotations_arg = parser.add_new_named_arg("edge-annotations");
+    edge_annotations_arg->set_long_name("edge-annotations");
+    edge_annotations_arg->set_description(_("What to render on dot edges (JSON always contains the full reldep list)"));
+    edge_annotations_arg->set_has_value(true);
+    edge_annotations_arg->set_arg_value_help("both|reldep|kind|none");
+    edge_annotations_arg->link_value(edge_annotations_option);
+    cmd.register_named_arg(edge_annotations_arg);
+
+    format_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionEnum>(FORMAT_DOT, std::vector<std::string>{FORMAT_DOT, FORMAT_JSON})));
+    auto * format_arg = parser.add_new_named_arg("format");
+    format_arg->set_long_name("format");
+    format_arg->set_description(_("Output format"));
+    format_arg->set_has_value(true);
+    format_arg->set_arg_value_help("dot|json");
+    format_arg->link_value(format_option);
+    cmd.register_named_arg(format_arg);
+
+    output_option = dynamic_cast<libdnf5::OptionPath *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionPath>("")));
+    auto * output_arg = parser.add_new_named_arg("output");
+    output_arg->set_long_name("output");
+    output_arg->set_description(_("Write output to FILE instead of stdout"));
+    output_arg->set_has_value(true);
+    output_arg->set_arg_value_help("FILE");
+    output_arg->link_value(output_option);
+    cmd.register_named_arg(output_arg);
+
+    create_json_option(*this);
+}
+
+
+void RepographCommand::configure() {
+    auto & ctx = get_context();
+
+    // ---- Mode selection.
+    bool use_system = use_system_option->get_value();
+    bool has_specs = !pkg_specs.empty();
+    if (use_system && has_specs) {
+        mode = RepographMode::TARGETED_CLOSED;
+    } else if (use_system) {
+        mode = RepographMode::CLOSED_SET;
+    } else if (has_specs) {
+        mode = RepographMode::TARGETED;
+    } else {
+        mode = RepographMode::REPO_WIDE;
+    }
+
+    // ---- Output format precedence.
+    // Explicit --format wins. Else --json switches to JSON. Else dot.
+    bool format_explicit = format_option->get_priority() > libdnf5::Option::Priority::DEFAULT;
+    bool json_requested = ctx.get_json_output_requested();
+    if (format_explicit) {
+        const std::string & fmt = format_option->get_value();
+        if (json_requested && fmt == FORMAT_DOT) {
+            throw libdnf5::cli::CommandExitError(
+                1, M_("Conflicting output options: --format=dot together with --json"));
+        }
+        format = (fmt == FORMAT_JSON) ? RepographFormat::JSON : RepographFormat::DOT;
+    } else if (json_requested) {
+        format = RepographFormat::JSON;
+    } else {
+        format = RepographFormat::DOT;
+    }
+
+    // ---- Other policy options.
+    provider_policy = parse_provider_policy(provider_policy_option->get_value());
+    node_id_policy = parse_node_id_policy(node_id_option->get_value());
+    edge_annotations = parse_edge_annotations(edge_annotations_option->get_value());
+    include_reverse_weak = include_reverse_weak_option->get_value();
+    include_weak_deps = ctx.get_base().get_config().get_install_weak_deps_option().get_value();
+    output_path = output_option->get_value();
+
+    // ---- Reject incompatible policy choices.
+    bool policy_explicit = provider_policy_option->get_priority() > libdnf5::Option::Priority::DEFAULT;
+    bool have_solver_set = (mode == RepographMode::TARGETED || mode == RepographMode::TARGETED_CLOSED);
+    if (provider_policy == repograph::ProviderPolicy::SOLVER && !have_solver_set && policy_explicit) {
+        throw libdnf5::cli::CommandExitError(
+            1, M_("--provider-policy=solver is only meaningful when SPECs are given (targeted modes)"));
+    }
+
+    // ---- Repository loading.
+    // We always want available repos loaded (for spec resolution and
+    // for repo-wide / open-universe walks). When --use-system is set we
+    // also load the installed sack.
+    ctx.set_load_available_repos(Context::LoadAvailableRepos::ENABLED);
+    if (mode == RepographMode::CLOSED_SET || mode == RepographMode::TARGETED_CLOSED) {
+        ctx.set_load_system_repo(true);
+    } else {
+        // CRITICAL: for targeted mode we must NOT load the installed
+        // system, otherwise already-installed roots produce empty
+        // transactions. (Rubber-duck found this; see plan.md.)
+        ctx.set_load_system_repo(false);
+    }
+    // File-level requires are common; loading filelists is essential for
+    // accurate provider lookup (mirrors what repoclosure does).
+    ctx.get_base().get_config().get_optional_metadata_types_option().add_item(
+        libdnf5::Option::Priority::RUNTIME, libdnf5::METADATA_TYPE_FILELISTS);
+}
+
+
+namespace {
+
+
+/// Read packages from the appropriate sack into a `PackageSet`, applying
+/// `filter_installed` / repo filters as needed.
+libdnf5::rpm::PackageSet build_set(libdnf5::Base & base, bool installed_only) {
+    libdnf5::rpm::PackageQuery q(base);
+    if (installed_only) {
+        q.filter_installed();
+    } else {
+        // PackageQuery default already covers everything; restrict to
+        // available so we don't accidentally include the system-rpmdb
+        // entries when both sacks happen to be loaded.
+        libdnf5::rpm::PackageQuery available(base);
+        available.filter_installed();
+        q -= available;
+    }
+    libdnf5::rpm::PackageSet set(base);
+    for (const auto & p : q) {
+        set.add(p);
+    }
+    return set;
+}
+
+
+std::string reason_to_string_safe(libdnf5::transaction::TransactionItemReason r) {
+    return libdnf5::transaction::transaction_item_reason_to_string(r);
+}
+
+
+}  // namespace
+
+
+void RepographCommand::run() {
+    auto & ctx = get_context();
+    auto & base = ctx.get_base();
+
+    repograph::BuilderConfig cfg(base.get_weak_ptr());
+    cfg.provider_policy = provider_policy;
+    cfg.node_id_policy = node_id_policy;
+    cfg.include_weak_deps = include_weak_deps;
+    cfg.include_reverse_weak = include_reverse_weak;
+
+    switch (mode) {
+        case RepographMode::REPO_WIDE: {
+            cfg.universe_pkgs = build_set(base, /*installed_only=*/false);
+            cfg.node_pkgs = cfg.universe_pkgs;
+            cfg.have_solver_set = false;
+            if (cfg.node_pkgs.size() > 5000) {
+                std::cerr << libdnf5::utils::sformat(
+                                 _("repograph: warning: repo-wide graph has {} packages; consider passing one or more "
+                                   "SPECs to scope the graph"),
+                                 cfg.node_pkgs.size())
+                          << std::endl;
+            }
+            break;
+        }
+        case RepographMode::CLOSED_SET: {
+            cfg.universe_pkgs = build_set(base, /*installed_only=*/true);
+            cfg.node_pkgs = cfg.universe_pkgs;
+            cfg.have_solver_set = false;
+            break;
+        }
+        case RepographMode::TARGETED: {
+            // Universe = available; node set = solver-resolved.
+            cfg.universe_pkgs = build_set(base, /*installed_only=*/false);
+            libdnf5::Goal goal(base);
+            for (const auto & spec : pkg_specs) {
+                goal.add_rpm_install(spec);
+            }
+            auto transaction = goal.resolve();
+            if (transaction.get_problems() != libdnf5::GoalProblem::NO_PROBLEM) {
+                throw libdnf5::cli::GoalResolveError(transaction);
+            }
+            libdnf5::rpm::PackageSet resolved(base);
+            for (const auto & tspkg : transaction.get_transaction_packages()) {
+                if (libdnf5::transaction::transaction_item_action_is_inbound(tspkg.get_action())) {
+                    auto pkg = tspkg.get_package();
+                    resolved.add(pkg);
+                    cfg.reasons[pkg.get_nevra()] = reason_to_string_safe(tspkg.get_reason());
+                }
+            }
+            cfg.node_pkgs = resolved;
+            // For SOLVER policy: limit universe to the resolved set so
+            // satisfier lookups intersect with the consistent install.
+            cfg.universe_pkgs = resolved;
+            cfg.have_solver_set = true;
+            break;
+        }
+        case RepographMode::TARGETED_CLOSED: {
+            // Universe = installed; resolve roots against installed sack.
+            cfg.universe_pkgs = build_set(base, /*installed_only=*/true);
+            libdnf5::rpm::PackageQuery installed(base);
+            installed.filter_installed();
+            libdnf5::rpm::PackageSet roots(base);
+            libdnf5::ResolveSpecSettings settings;
+            settings.set_with_nevra(true);
+            settings.set_with_provides(true);
+            settings.set_with_filenames(true);
+            for (const auto & spec : pkg_specs) {
+                libdnf5::rpm::PackageQuery candidates(installed);
+                auto nevra_pair = candidates.resolve_pkg_spec(spec, settings, true);
+                if (!nevra_pair.first) {
+                    std::cerr << libdnf5::utils::sformat(
+                                     _("repograph: no match for spec in installed system: {}"), spec)
+                              << std::endl;
+                    continue;
+                }
+                for (const auto & p : candidates) {
+                    roots.add(p);
+                }
+            }
+            // Compute transitive closure within the installed set by
+            // doing a naive BFS over reldeps (no solver runs, since the
+            // universe is fully pinned).
+            libdnf5::rpm::PackageSet visited(base);
+            std::vector<libdnf5::rpm::Package> frontier;
+            for (const auto & p : roots) {
+                visited.add(p);
+                frontier.push_back(p);
+            }
+            while (!frontier.empty()) {
+                std::vector<libdnf5::rpm::Package> next;
+                for (const auto & p : frontier) {
+                    auto walk_one = [&](libdnf5::rpm::ReldepList deps) {
+                        for (const auto & rd : deps) {
+                            libdnf5::rpm::PackageQuery q(base);
+                            q.filter_provides(rd);
+                            for (const auto & dep_pkg : q) {
+                                if (!cfg.universe_pkgs.contains(dep_pkg)) {
+                                    continue;
+                                }
+                                if (visited.contains(dep_pkg)) {
+                                    continue;
+                                }
+                                visited.add(dep_pkg);
+                                next.push_back(dep_pkg);
+                            }
+                        }
+                    };
+                    walk_one(p.get_regular_requires());
+                    walk_one(p.get_requires_pre());
+                    if (include_weak_deps) {
+                        walk_one(p.get_recommends());
+                        walk_one(p.get_suggests());
+                    }
+                }
+                frontier = std::move(next);
+            }
+            cfg.node_pkgs = visited;
+            cfg.have_solver_set = false;
+            break;
+        }
+    }
+
+    auto graph = repograph::build_graph(cfg);
+
+    std::ofstream file_stream;
+    std::ostream * out = &std::cout;
+    if (!output_path.empty()) {
+        file_stream.open(output_path);
+        if (!file_stream) {
+            throw libdnf5::cli::CommandExitError(
+                1, M_("Failed to open output file: {}"), output_path);
+        }
+        out = &file_stream;
+    }
+
+    if (format == RepographFormat::JSON) {
+        repograph::emit_json(
+            *out,
+            graph,
+            mode_to_string(mode),
+            node_id_option->get_value(),
+            provider_policy_option->get_value());
+    } else {
+        repograph::emit_dot(*out, graph, edge_annotations);
+    }
+}
+
+
+}  // namespace dnf5

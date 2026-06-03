@@ -1,0 +1,304 @@
+// Copyright Contributors to the DNF5 project.
+// Copyright Contributors to the libdnf project.
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
+// This file is part of libdnf: https://github.com/rpm-software-management/libdnf/
+//
+// Libdnf is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
+// (at your option) any later version.
+//
+// Libdnf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
+
+#include "RepographTest.hpp"
+
+#include "dot_emitter.hpp"
+#include "graph_builder.hpp"
+#include "json_emitter.hpp"
+#include "repograph.hpp"
+
+#include <dnf5/context.hpp>
+
+#include <sstream>
+
+
+using namespace dnf5;
+
+
+namespace {
+
+
+/// Create an argument-parser-ready context and a RepographCommand. The
+/// returned command has had `set_argument_parser()` called, so its
+/// option/argument metadata is queryable.
+struct Fixture {
+    std::vector<std::unique_ptr<libdnf5::Logger>> loggers;
+    std::unique_ptr<Context> ctx;
+    std::unique_ptr<RepographCommand> cmd;
+
+    Fixture() {
+        ctx = std::make_unique<Context>(std::move(loggers));
+        auto & parser = ctx->get_argument_parser();
+        auto root = parser.add_new_command("test");
+        parser.set_root_command(root);
+        cmd = std::make_unique<RepographCommand>(*ctx);
+        cmd->set_argument_parser();
+    }
+};
+
+
+repograph::Graph make_two_node_graph() {
+    repograph::Node a;
+    a.id = "a";
+    a.name = "a";
+    a.epoch = "0";
+    a.version = "1";
+    a.release = "1";
+    a.arch = "x86_64";
+    a.repo = "test";
+    a.nevra = "a-1-1.x86_64";
+
+    repograph::Node b;
+    b.id = "b";
+    b.name = "b";
+    b.epoch = "";
+    b.version = "2";
+    b.release = "3";
+    b.arch = "x86_64";
+    b.repo = "test";
+    b.nevra = "b-2-3.x86_64";
+
+    repograph::Edge e;
+    e.from = "a";
+    e.to = "b";
+    repograph::EdgeReldep rd;
+    rd.reldep = "libb.so.1()(64bit)";
+    rd.kind = repograph::EdgeKind::REGULAR;
+    e.reldeps.push_back(rd);
+
+    repograph::Graph g;
+    g.nodes = {a, b};
+    g.edges = {e};
+    return g;
+}
+
+
+}  // namespace
+
+
+void RepographTest::setUp() {}
+void RepographTest::tearDown() {}
+
+
+void RepographTest::test_all_options_registered() {
+    Fixture f;
+    auto & cp = *f.cmd->get_argument_parser_command();
+
+    // Each of these throws if the arg isn't registered.
+    (void)cp.get_named_arg("use-system");
+    (void)cp.get_named_arg("include-reverse-weak");
+    (void)cp.get_named_arg("provider-policy");
+    (void)cp.get_named_arg("node-id");
+    (void)cp.get_named_arg("edge-annotations");
+    (void)cp.get_named_arg("format");
+    (void)cp.get_named_arg("output");
+    (void)cp.get_named_arg("json");
+    (void)cp.get_positional_arg("specs");
+}
+
+
+void RepographTest::test_use_system_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("use-system");
+    CPPUNIT_ASSERT_EQUAL(std::string("use-system"), arg.get_long_name());
+    CPPUNIT_ASSERT(!arg.get_description().empty());
+}
+
+
+void RepographTest::test_include_reverse_weak_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("include-reverse-weak");
+    CPPUNIT_ASSERT_EQUAL(std::string("include-reverse-weak"), arg.get_long_name());
+    std::string desc = arg.get_description();
+    CPPUNIT_ASSERT(desc.find("Supplements") != std::string::npos);
+}
+
+
+void RepographTest::test_provider_policy_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("provider-policy");
+    CPPUNIT_ASSERT_EQUAL(std::string("provider-policy"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_node_id_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("node-id");
+    CPPUNIT_ASSERT_EQUAL(std::string("node-id"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_edge_annotations_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-annotations");
+    CPPUNIT_ASSERT_EQUAL(std::string("edge-annotations"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_format_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("format");
+    CPPUNIT_ASSERT_EQUAL(std::string("format"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_output_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("output");
+    CPPUNIT_ASSERT_EQUAL(std::string("output"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_json_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("json");
+    CPPUNIT_ASSERT_EQUAL(std::string("json"), arg.get_long_name());
+}
+
+
+void RepographTest::test_specs_positional() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_positional_arg("specs");
+    CPPUNIT_ASSERT(!arg.get_description().empty());
+}
+
+
+void RepographTest::test_edge_kind_strings() {
+    CPPUNIT_ASSERT_EQUAL(std::string("regular"), repograph::to_string(repograph::EdgeKind::REGULAR));
+    CPPUNIT_ASSERT_EQUAL(std::string("requires-pre"), repograph::to_string(repograph::EdgeKind::REQUIRES_PRE));
+    CPPUNIT_ASSERT_EQUAL(std::string("recommends"), repograph::to_string(repograph::EdgeKind::RECOMMENDS));
+    CPPUNIT_ASSERT_EQUAL(std::string("suggests"), repograph::to_string(repograph::EdgeKind::SUGGESTS));
+    CPPUNIT_ASSERT_EQUAL(std::string("supplemented-by"), repograph::to_string(repograph::EdgeKind::SUPPLEMENTED_BY));
+    CPPUNIT_ASSERT_EQUAL(std::string("enhanced-by"), repograph::to_string(repograph::EdgeKind::ENHANCED_BY));
+}
+
+
+void RepographTest::test_dot_emit_empty() {
+    repograph::Graph g;
+    std::ostringstream out;
+    repograph::emit_dot(out, g, repograph::EdgeAnnotations::BOTH);
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("digraph packages {") != std::string::npos);
+    CPPUNIT_ASSERT(s.rfind("}\n") != std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_simple() {
+    auto g = make_two_node_graph();
+    std::ostringstream out;
+    repograph::emit_dot(out, g, repograph::EdgeAnnotations::BOTH);
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"a\";") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"b\";") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"a\" -> \"b\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("regular:libb.so.1") != std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_quoting() {
+    repograph::Graph g;
+    repograph::Node n;
+    n.id = "weird\"id\\here";
+    g.nodes.push_back(n);
+    std::ostringstream out;
+    repograph::emit_dot(out, g, repograph::EdgeAnnotations::NONE);
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"weird\\\"id\\\\here\"") != std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_annotations_modes() {
+    auto g = make_two_node_graph();
+
+    auto render = [&](repograph::EdgeAnnotations mode) {
+        std::ostringstream out;
+        repograph::emit_dot(out, g, mode);
+        return out.str();
+    };
+
+    std::string both = render(repograph::EdgeAnnotations::BOTH);
+    CPPUNIT_ASSERT(both.find("regular:libb.so.1") != std::string::npos);
+
+    std::string reldep_only = render(repograph::EdgeAnnotations::RELDEP);
+    CPPUNIT_ASSERT(reldep_only.find("libb.so.1") != std::string::npos);
+    CPPUNIT_ASSERT(reldep_only.find("regular:") == std::string::npos);
+
+    std::string kind_only = render(repograph::EdgeAnnotations::KIND);
+    CPPUNIT_ASSERT(kind_only.find("label=\"regular\"") != std::string::npos);
+    CPPUNIT_ASSERT(kind_only.find("libb.so.1") == std::string::npos);
+
+    std::string none = render(repograph::EdgeAnnotations::NONE);
+    CPPUNIT_ASSERT(none.find("label=") == std::string::npos);
+}
+
+
+void RepographTest::test_json_emit_empty() {
+    repograph::Graph g;
+    std::ostringstream out;
+    repograph::emit_json(out, g, "repo-wide", "nevra", "best");
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"mode\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"repo-wide\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"nodes\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"edges\"") != std::string::npos);
+}
+
+
+void RepographTest::test_json_emit_simple() {
+    auto g = make_two_node_graph();
+    std::ostringstream out;
+    repograph::emit_json(out, g, "targeted", "nevra", "solver");
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"targeted\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"a-1-1.x86_64\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"libb.so.1()(64bit)\"") != std::string::npos);
+    // Edge "from"/"to" should refer to display ids ("a","b") not nevras.
+    CPPUNIT_ASSERT(s.find("\"from\": \"a\"") != std::string::npos || s.find("\"from\":\"a\"") != std::string::npos);
+}
+
+
+void RepographTest::test_json_emit_includes_members() {
+    repograph::Graph g;
+    repograph::Node merged;
+    merged.id = "foo";
+    merged.name = "foo";
+    merged.version = "1";
+    merged.release = "1";
+    merged.arch = "x86_64";
+    merged.repo = "test";
+    merged.nevra = "foo-1-1.x86_64";
+    merged.members = {"foo-1-1.i686", "foo-1-1.x86_64", "foo-2-1.x86_64"};
+    g.nodes.push_back(merged);
+
+    std::ostringstream out;
+    repograph::emit_json(out, g, "repo-wide", "name", "best");
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"members\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("foo-1-1.i686") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("foo-2-1.x86_64") != std::string::npos);
+}
+
+
+CPPUNIT_TEST_SUITE_REGISTRATION(RepographTest);
