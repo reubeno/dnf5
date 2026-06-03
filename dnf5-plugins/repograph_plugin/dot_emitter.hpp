@@ -37,7 +37,17 @@ namespace dnf5::repograph {
 /// `edge_label_limit`, only the first `edge_label_limit - 1` are shown
 /// followed by a summary line ("...and N more"). A value of 0 disables
 /// the limit and renders every entry.
-void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations, size_t edge_label_limit = 0);
+///
+/// When `style` is `BY_KIND`, edges carrying only weak dependencies
+/// (recommends/suggests/supplemented-by/enhanced-by) are rendered with
+/// a dashed gray style; edges containing at least one strong dependency
+/// (requires/requires-pre) get the default solid style.
+void emit_dot(
+    std::ostream & out,
+    const Graph & graph,
+    EdgeAnnotations annotations,
+    size_t edge_label_limit = 0,
+    EdgeStyle style = EdgeStyle::PLAIN);
 
 
 }  // namespace dnf5::repograph

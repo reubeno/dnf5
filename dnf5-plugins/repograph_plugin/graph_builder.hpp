@@ -84,6 +84,14 @@ enum class EdgeAnnotations {
 };
 
 
+/// Render options for dot edge appearance (style / color), independent
+/// of the label content.
+enum class EdgeStyle {
+    PLAIN,     ///< Plain black solid arrows for every edge.
+    BY_KIND,   ///< Strong deps solid; weak deps dashed and dimmed.
+};
+
+
 /// A single reldep entry attached to an edge.
 struct EdgeReldep {
     std::string reldep;

@@ -83,6 +83,7 @@ private:
     repograph::NodeIdPolicy node_label_policy{repograph::NodeIdPolicy::NAME};
     repograph::EdgeAnnotations edge_label{repograph::EdgeAnnotations::NONE};
     size_t edge_label_limit{5};
+    repograph::EdgeStyle edge_style{repograph::EdgeStyle::PLAIN};
     bool include_reverse_weak{false};
     bool include_weak_deps{true};
     std::string output_path;
@@ -96,6 +97,7 @@ private:
     libdnf5::OptionEnum * node_label_option{nullptr};
     libdnf5::OptionEnum * edge_label_option{nullptr};
     libdnf5::OptionNumber<std::int32_t> * edge_label_limit_option{nullptr};
+    libdnf5::OptionEnum * edge_style_option{nullptr};
     libdnf5::OptionEnum * format_option{nullptr};
     libdnf5::OptionPath * output_option{nullptr};
 };

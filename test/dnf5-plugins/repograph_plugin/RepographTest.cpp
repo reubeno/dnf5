@@ -109,6 +109,7 @@ void RepographTest::test_all_options_registered() {
     (void)cp.get_named_arg("node-label");
     (void)cp.get_named_arg("edge-label");
     (void)cp.get_named_arg("edge-label-limit");
+    (void)cp.get_named_arg("edge-style");
     (void)cp.get_named_arg("format");
     (void)cp.get_named_arg("output");
     (void)cp.get_named_arg("json");
@@ -173,6 +174,16 @@ void RepographTest::test_edge_label_limit_option() {
     CPPUNIT_ASSERT_EQUAL(std::string("edge-label-limit"), arg.get_long_name());
     CPPUNIT_ASSERT(arg.get_has_value());
     CPPUNIT_ASSERT(arg.get_description().find("default: 5") != std::string::npos);
+}
+
+
+void RepographTest::test_edge_style_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-style");
+    CPPUNIT_ASSERT_EQUAL(std::string("edge-style"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+    CPPUNIT_ASSERT(arg.get_description().find("default: plain") != std::string::npos);
+    CPPUNIT_ASSERT(arg.get_description().find("by-kind") != std::string::npos);
 }
 
 
@@ -356,6 +367,53 @@ void RepographTest::test_dot_emit_label_limit() {
     std::string s0 = out0.str();
     CPPUNIT_ASSERT(s0.find("dep9") != std::string::npos);
     CPPUNIT_ASSERT(s0.find("more") == std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_edge_style_by_kind() {
+    // Build a graph with two edges: one strong-only (REQUIRES), one
+    // weak-only (RECOMMENDS). With BY_KIND, only the weak edge should
+    // get the dashed/dim style.
+    repograph::Graph g;
+    repograph::Node n;
+    n.id = "a";
+    g.nodes.push_back(n);
+    n.id = "b";
+    g.nodes.push_back(n);
+    n.id = "c";
+    g.nodes.push_back(n);
+
+    repograph::Edge strong;
+    strong.from = "a";
+    strong.to = "b";
+    repograph::EdgeReldep r;
+    r.reldep = "b";
+    r.kind = repograph::EdgeKind::REQUIRES;
+    strong.reldeps.push_back(r);
+
+    repograph::Edge weak;
+    weak.from = "a";
+    weak.to = "c";
+    r.reldep = "c";
+    r.kind = repograph::EdgeKind::RECOMMENDS;
+    weak.reldeps.push_back(r);
+
+    g.edges = {strong, weak};
+
+    std::ostringstream out;
+    repograph::emit_dot(
+        out, g, repograph::EdgeAnnotations::NONE, /*limit=*/0, repograph::EdgeStyle::BY_KIND);
+    std::string s = out.str();
+    // Weak-only edge gets the dashed style; strong edge gets no extra
+    // attrs (default solid).
+    CPPUNIT_ASSERT(s.find("\"a\" -> \"c\" [style=dashed") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"a\" -> \"b\";") != std::string::npos);
+
+    // With PLAIN style (default), no edges get a style attribute.
+    std::ostringstream out_plain;
+    repograph::emit_dot(
+        out_plain, g, repograph::EdgeAnnotations::NONE, /*limit=*/0, repograph::EdgeStyle::PLAIN);
+    CPPUNIT_ASSERT(out_plain.str().find("style=dashed") == std::string::npos);
 }
 
 

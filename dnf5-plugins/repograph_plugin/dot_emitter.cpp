@@ -103,21 +103,58 @@ std::string render_edge_label(const Edge & edge, EdgeAnnotations annotations, si
 }
 
 
+bool is_strong_kind(EdgeKind k) {
+    return k == EdgeKind::REQUIRES || k == EdgeKind::REQUIRES_PRE;
+}
+
+
+/// Edge style attributes (e.g. `style=dashed,color="#888"`) appropriate
+/// for the dominant kind of `edge`. An edge with at least one strong
+/// dependency is rendered as strong (solid); otherwise it's weak-only
+/// and gets dashed-gray.
+std::string render_edge_style(const Edge & edge) {
+    for (const auto & rd : edge.reldeps) {
+        if (is_strong_kind(rd.kind)) {
+            return {};  // default solid
+        }
+    }
+    return "style=dashed,color=\"#888888\"";
+}
+
+
 }  // namespace
 
 
-void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations, size_t edge_label_limit) {
+void emit_dot(
+    std::ostream & out,
+    const Graph & graph,
+    EdgeAnnotations annotations,
+    size_t edge_label_limit,
+    EdgeStyle style) {
     out << "digraph packages {\n";
     for (const auto & n : graph.nodes) {
         out << "    " << quote(n.id) << ";\n";
     }
     for (const auto & e : graph.edges) {
         out << "    " << quote(e.from) << " -> " << quote(e.to);
+
         std::string label = render_edge_label(e, annotations, edge_label_limit);
-        if (!label.empty()) {
-            // The label is already escape-safe and contains pre-formed
-            // `\l` line breaks; wrap in quotes without further escaping.
-            out << " [label=\"" << label << "\"]";
+        std::string style_attrs = (style == EdgeStyle::BY_KIND) ? render_edge_style(e) : std::string{};
+
+        if (!label.empty() || !style_attrs.empty()) {
+            out << " [";
+            bool need_comma = false;
+            if (!label.empty()) {
+                out << "label=\"" << label << "\"";
+                need_comma = true;
+            }
+            if (!style_attrs.empty()) {
+                if (need_comma) {
+                    out << ",";
+                }
+                out << style_attrs;
+            }
+            out << "]";
         }
         out << ";\n";
     }

@@ -57,6 +57,9 @@ constexpr const char * EDGE_LABEL_DEP = "dep";
 constexpr const char * EDGE_LABEL_KIND = "kind";
 constexpr const char * EDGE_LABEL_BOTH = "both";
 
+constexpr const char * EDGE_STYLE_PLAIN = "plain";
+constexpr const char * EDGE_STYLE_BY_KIND = "by-kind";
+
 constexpr const char * FORMAT_DOT = "dot";
 constexpr const char * FORMAT_JSON = "json";
 
@@ -112,6 +115,15 @@ repograph::EdgeAnnotations parse_edge_label(const std::string & s) {
     if (s == EDGE_LABEL_NONE)
         return repograph::EdgeAnnotations::NONE;
     throw std::runtime_error("invalid edge-label: " + s);
+}
+
+
+repograph::EdgeStyle parse_edge_style(const std::string & s) {
+    if (s == EDGE_STYLE_PLAIN)
+        return repograph::EdgeStyle::PLAIN;
+    if (s == EDGE_STYLE_BY_KIND)
+        return repograph::EdgeStyle::BY_KIND;
+    throw std::runtime_error("invalid edge-style: " + s);
 }
 
 
@@ -233,6 +245,19 @@ void RepographCommand::set_argument_parser() {
     edge_label_limit_arg->link_value(edge_label_limit_option);
     cmd.register_named_arg(edge_label_limit_arg);
 
+    edge_style_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionEnum>(
+            EDGE_STYLE_PLAIN, std::vector<std::string>{EDGE_STYLE_PLAIN, EDGE_STYLE_BY_KIND})));
+    auto * edge_style_arg = parser.add_new_named_arg("edge-style");
+    edge_style_arg->set_long_name("edge-style");
+    edge_style_arg->set_description(
+        _("Visual styling of dot edges (default: plain). With \"by-kind\", edges carrying only weak dependencies "
+          "(recommends/suggests/supplemented-by/enhanced-by) are dashed and dimmed; strong edges stay solid."));
+    edge_style_arg->set_has_value(true);
+    edge_style_arg->set_arg_value_help("plain|by-kind");
+    edge_style_arg->link_value(edge_style_option);
+    cmd.register_named_arg(edge_style_arg);
+
     format_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
         std::make_unique<libdnf5::OptionEnum>(FORMAT_DOT, std::vector<std::string>{FORMAT_DOT, FORMAT_JSON})));
     auto * format_arg = parser.add_new_named_arg("format");
@@ -305,6 +330,7 @@ void RepographCommand::configure() {
     node_label_policy = parse_node_label(node_label_option->get_value());
     edge_label = parse_edge_label(edge_label_option->get_value());
     edge_label_limit = static_cast<size_t>(edge_label_limit_option->get_value());
+    edge_style = parse_edge_style(edge_style_option->get_value());
     include_reverse_weak = include_reverse_weak_option->get_value();
     include_weak_deps = ctx.get_base().get_config().get_install_weak_deps_option().get_value();
     output_path = output_option->get_value();
@@ -575,7 +601,7 @@ void RepographCommand::run() {
             node_label_option->get_value(),
             resolver_option->get_value());
     } else {
-        repograph::emit_dot(*out, graph, edge_label, edge_label_limit);
+        repograph::emit_dot(*out, graph, edge_label, edge_label_limit, edge_style);
     }
 }
 

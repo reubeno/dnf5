@@ -164,6 +164,15 @@ Defaults are noted inline. All flags also appear in ``dnf5 repograph
       disables the cap and renders every entry. Affects dot output
       only; JSON always carries the full list.
 
+``--edge-style=plain|by-kind`` (default: ``plain``)
+    | Visual styling of dot edges. With ``by-kind``, edges carrying
+      only weak dependencies (``recommends``/``suggests`` and, with
+      ``--include-reverse-weak``, ``supplemented-by``/``enhanced-by``)
+      are rendered dashed and dimmed; edges with at least one strong
+      dependency (``requires``/``requires-pre``) stay solid. Useful
+      for telling weak vs strong relationships apart at a glance when
+      labels are off. Affects dot output only.
+
 ``--format=dot|json`` (default: ``dot``)
     | Output format. If both ``--format=dot`` and ``--json`` are
       passed, the command errors out.
