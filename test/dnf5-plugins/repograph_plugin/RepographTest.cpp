@@ -324,4 +324,34 @@ void RepographTest::test_json_emit_includes_members() {
 }
 
 
+void RepographTest::test_json_emit_includes_unresolved() {
+    repograph::Graph g;
+    repograph::Node n;
+    n.id = "bash";
+    n.name = "bash";
+    n.version = "5.3.9";
+    n.release = "5";
+    n.arch = "x86_64";
+    n.repo = "test";
+    n.nevra = "bash-5.3.9-5.x86_64";
+
+    repograph::EdgeReldep u1;
+    u1.reldep = "libc.so.6()(64bit)";
+    u1.kind = repograph::EdgeKind::REGULAR;
+    repograph::EdgeReldep u2;
+    u2.reldep = "libtinfo.so.6()(64bit)";
+    u2.kind = repograph::EdgeKind::REGULAR;
+    n.unresolved = {u1, u2};
+
+    g.nodes.push_back(n);
+
+    std::ostringstream out;
+    repograph::emit_json(out, g, "specs-closed", "name", "solver");
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("\"unresolved\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("libc.so.6") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("libtinfo.so.6") != std::string::npos);
+}
+
+
 CPPUNIT_TEST_SUITE_REGISTRATION(RepographTest);

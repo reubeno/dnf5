@@ -53,6 +53,16 @@ json_object * build_node(const Node & n) {
         }
         json_object_object_add(j, "members", mem);
     }
+    if (!n.unresolved.empty()) {
+        json_object * arr = json_object_new_array();
+        for (const auto & u : n.unresolved) {
+            json_object * jr = json_object_new_object();
+            json_object_object_add(jr, "reldep", json_object_new_string(u.reldep.c_str()));
+            json_object_object_add(jr, "kind", json_object_new_string(to_string(u.kind).c_str()));
+            json_object_array_add(arr, jr);
+        }
+        json_object_object_add(j, "unresolved", arr);
+    }
     return j;
 }
 

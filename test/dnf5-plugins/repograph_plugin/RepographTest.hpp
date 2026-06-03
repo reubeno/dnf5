@@ -45,6 +45,7 @@ class RepographTest : public CppUnit::TestCase {
     CPPUNIT_TEST(test_json_emit_empty);
     CPPUNIT_TEST(test_json_emit_simple);
     CPPUNIT_TEST(test_json_emit_includes_members);
+    CPPUNIT_TEST(test_json_emit_includes_unresolved);
     CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -71,6 +72,7 @@ public:
     void test_json_emit_empty();
     void test_json_emit_simple();
     void test_json_emit_includes_members();
+    void test_json_emit_includes_unresolved();
 };
 
 #endif  // DNF5_TEST_REPOGRAPH_HPP

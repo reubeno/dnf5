@@ -247,6 +247,14 @@ Each **node** object contains:
   NEVRA collapsed into this node. Lists those NEVRAs so synthetic
   name-collision self-loops remain diagnosable.
 
+- ``unresolved`` (array, optional) — only present (and only in
+  closed-universe modes: ``--closed``, ``--use-system``, and
+  ``--use-system <specs>``) when this node has reldeps with no
+  satisfier inside the closed universe. Each entry has the same
+  ``reldep`` and ``kind`` shape as in ``edges[].reldeps``. The plugin
+  also prints a single-line summary to stderr when any unresolved
+  deps were detected. (Exit code is unchanged.)
+
 Each **edge** object contains:
 
 - ``from`` (string) — source node id.

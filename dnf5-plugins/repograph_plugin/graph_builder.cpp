@@ -260,7 +260,9 @@ void add_reldep_to_edge(
 }
 
 
-/// Walk one forward-dep bucket for a single source package.
+/// Walk one forward-dep bucket for a single source package. If
+/// `unresolved_out` is non-null, reldeps with zero satisfiers in the
+/// universe are recorded there (used in closed-universe modes).
 void walk_forward(
     const libdnf5::rpm::Package & pkg,
     const std::string & from_id,
@@ -268,11 +270,32 @@ void walk_forward(
     EdgeKind kind,
     ProviderCache & cache,
     const BuilderConfig & cfg,
-    std::map<std::pair<std::string, std::string>, Edge> & edge_map) {
+    std::map<std::pair<std::string, std::string>, Edge> & edge_map,
+    std::vector<EdgeReldep> * unresolved_out) {
     for (const auto & rd : deps) {
         const auto & candidates = cache.lookup(rd);
         auto providers = select_providers(candidates, cfg.node_pkgs, cfg.provider_policy, cfg.have_solver_set, pkg);
         std::string rd_str = rd.to_string();
+
+        if (providers.empty()) {
+            if (unresolved_out) {
+                // De-duplicate: same reldep+kind already recorded?
+                bool already = false;
+                for (const auto & u : *unresolved_out) {
+                    if (u.reldep == rd_str && u.kind == kind) {
+                        already = true;
+                        break;
+                    }
+                }
+                if (!already) {
+                    EdgeReldep u;
+                    u.reldep = rd_str;
+                    u.kind = kind;
+                    unresolved_out->push_back(std::move(u));
+                }
+            }
+            continue;
+        }
 
         if (cfg.provider_policy == ProviderPolicy::OR_NODE && providers.size() > 1) {
             // Synthesize "or:<reldep>" virtual node.
@@ -417,11 +440,13 @@ Graph build_graph(const BuilderConfig & cfg) {
             node_it->second.members.push_back(pkg.get_nevra());
         }
 
-        walk_forward(pkg, id, pkg.get_regular_requires(), EdgeKind::REGULAR, cache, cfg, edge_map);
-        walk_forward(pkg, id, pkg.get_requires_pre(), EdgeKind::REQUIRES_PRE, cache, cfg, edge_map);
+        std::vector<EdgeReldep> * unresolved_out = cfg.closed_universe ? &node_it->second.unresolved : nullptr;
+
+        walk_forward(pkg, id, pkg.get_regular_requires(), EdgeKind::REGULAR, cache, cfg, edge_map, unresolved_out);
+        walk_forward(pkg, id, pkg.get_requires_pre(), EdgeKind::REQUIRES_PRE, cache, cfg, edge_map, unresolved_out);
         if (cfg.include_weak_deps) {
-            walk_forward(pkg, id, pkg.get_recommends(), EdgeKind::RECOMMENDS, cache, cfg, edge_map);
-            walk_forward(pkg, id, pkg.get_suggests(), EdgeKind::SUGGESTS, cache, cfg, edge_map);
+            walk_forward(pkg, id, pkg.get_recommends(), EdgeKind::RECOMMENDS, cache, cfg, edge_map, unresolved_out);
+            walk_forward(pkg, id, pkg.get_suggests(), EdgeKind::SUGGESTS, cache, cfg, edge_map, unresolved_out);
         }
         if (cfg.include_reverse_weak) {
             walk_reverse_weak(pkg, id, EdgeKind::SUPPLEMENTED_BY, base, cfg, edge_map);
@@ -437,6 +462,13 @@ Graph build_graph(const BuilderConfig & cfg) {
             std::sort(n.members.begin(), n.members.end());
             n.members.erase(std::unique(n.members.begin(), n.members.end()), n.members.end());
         }
+        // Deterministic ordering of unresolved deps within a node.
+        std::sort(n.unresolved.begin(), n.unresolved.end(), [](const EdgeReldep & a, const EdgeReldep & b) {
+            if (a.kind != b.kind) {
+                return to_string(a.kind) < to_string(b.kind);
+            }
+            return a.reldep < b.reldep;
+        });
         g.nodes.push_back(std::move(n));
     }
     std::sort(g.nodes.begin(), g.nodes.end(), [](const Node & a, const Node & b) { return a.id < b.id; });

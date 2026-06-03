@@ -366,6 +366,8 @@ void RepographCommand::run() {
     cfg.node_id_policy = node_label_policy;
     cfg.include_weak_deps = include_weak_deps;
     cfg.include_reverse_weak = include_reverse_weak;
+    cfg.closed_universe = (mode == RepographMode::SPECS_CLOSED || mode == RepographMode::CLOSED_SET ||
+                           mode == RepographMode::TARGETED_CLOSED);
 
     switch (mode) {
         case RepographMode::REPO_WIDE: {
@@ -518,6 +520,28 @@ void RepographCommand::run() {
     }
 
     auto graph = repograph::build_graph(cfg);
+
+    // Surface unresolved-dep summary on stderr for closed-universe modes.
+    // The graph itself is still emitted; this is informational. JSON
+    // output also includes per-node "unresolved" arrays.
+    if (cfg.closed_universe) {
+        size_t total_unresolved = 0;
+        size_t nodes_with_unresolved = 0;
+        for (const auto & n : graph.nodes) {
+            if (!n.unresolved.empty()) {
+                ++nodes_with_unresolved;
+                total_unresolved += n.unresolved.size();
+            }
+        }
+        if (total_unresolved > 0) {
+            std::cerr << libdnf5::utils::sformat(
+                             _("repograph: warning: {} dependency reldeps on {} packages had no satisfier in the "
+                               "closed universe (see per-node \"unresolved\" arrays in JSON output)"),
+                             total_unresolved,
+                             nodes_with_unresolved)
+                      << std::endl;
+        }
+    }
 
     std::ofstream file_stream;
     std::ostream * out = &std::cout;

@@ -115,6 +115,10 @@ struct Node {
     /// Underlying NEVRAs that map to this node (only populated when
     /// merging occurred).
     std::vector<std::string> members;
+    /// Reldeps on this node that have no satisfier inside the closed
+    /// universe. Only populated in closed-universe modes (where the
+    /// caller sets `BuilderConfig::closed_universe`).
+    std::vector<EdgeReldep> unresolved;
 };
 
 
@@ -155,6 +159,12 @@ struct BuilderConfig {
     NodeIdPolicy node_id_policy{NodeIdPolicy::NAME};
     bool include_weak_deps{true};
     bool include_reverse_weak{false};
+    /// When true, the universe is closed: any reldep with zero
+    /// satisfiers inside `universe_pkgs` is recorded on the source
+    /// node's `unresolved` list (in addition to being silently
+    /// dropped from the edge set). Set this for `--closed`,
+    /// `--use-system`, and `--use-system <specs>` modes.
+    bool closed_universe{false};
 
     explicit BuilderConfig(const libdnf5::BaseWeakPtr & base);
 };
