@@ -299,6 +299,11 @@ void RepographTest::test_json_emit_simple() {
     CPPUNIT_ASSERT(s.find("\"libb.so.1()(64bit)\"") != std::string::npos);
     // Edge "from"/"to" should refer to display ids ("a","b") not nevras.
     CPPUNIT_ASSERT(s.find("\"from\": \"a\"") != std::string::npos || s.find("\"from\":\"a\"") != std::string::npos);
+    // Edge dependency list uses user-friendly "deps"/"dep" field names,
+    // not the internal "reldeps"/"reldep" jargon.
+    CPPUNIT_ASSERT(s.find("\"deps\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"dep\"") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("\"reldeps\"") == std::string::npos);
 }
 
 

@@ -43,7 +43,7 @@ document. It is the dnf5 successor to the dnf4 ``repograph`` /
   *root* package specs, restrict the universe to an explicit set of
   packages, or analyze the dependency graph *within* the set of
   currently installed packages.
-* Full per-reldep edge data distinguishing regular requires,
+* Full per-dependency edge data distinguishing regular requires,
   ``Requires(pre)``, ``Recommends``, ``Suggests``, and (with
   ``--include-reverse-weak``) ``Supplements``/``Enhances``.
 * Honors the dnf5 ``install_weak_deps`` configuration option (so
@@ -113,11 +113,11 @@ Defaults are noted inline. All flags also appear in ``dnf5 repograph
 
 ``--include-reverse-weak``
     | Also draw edges derived from ``Supplements`` and ``Enhances``
-      reldeps. These are direction-corrected to read as forward edges
-      labeled ``supplemented-by`` and ``enhanced-by`` respectively.
-      Rich reverse-weak deps (those with multi-package boolean
-      conditions) are skipped with a stderr warning; the JSON output
-      includes a ``"skipped":true`` marker in that case.
+      dependencies. These are direction-corrected to read as forward
+      edges labeled ``supplemented-by`` and ``enhanced-by``
+      respectively. Rich reverse-weak deps (those with multi-package
+      boolean conditions) are skipped with a stderr warning; the JSON
+      output includes a ``"skipped":true`` marker in that case.
 
 ``--resolver=solver|first|best|all|or-node`` (default: ``solver``)
     | How to resolve which provider to draw an edge to when multiple
@@ -132,7 +132,7 @@ Defaults are noted inline. All flags also appear in ``dnf5 repograph
       EVR, name, arch, repo id, and solvable id as ordered tiebreaks.
     | ``all`` — emit one edge per satisfier; alternatives are marked
       ``"alt": true`` in JSON.
-    | ``or-node`` — synthesize a virtual ``or:<reldep>`` node that
+    | ``or-node`` — synthesize a virtual ``or:<dep>`` node that
       fans out to all satisfiers. Useful for human-readable
       visualization of disjunctive dependencies.
 
@@ -145,14 +145,15 @@ Defaults are noted inline. All flags also appear in ``dnf5 repograph
       (different arches or EVRs) collapse into one node. JSON output
       records the underlying NEVRAs in a ``members`` array.
 
-``--edge-label=none|reldep|kind|both`` (default: ``none``)
+``--edge-label=none|dep|kind|both`` (default: ``none``)
     | What text to render on dot edge labels. Does **not** affect
-      JSON output, which always contains the full structured reldep
-      list per edge.
+      JSON output, which always contains the full structured
+      dependency list per edge.
     | ``none`` — no edge labels (keeps large graphs readable).
-    | ``reldep`` — just the reldep string.
+    | ``dep`` — just the dependency string (e.g.
+      ``libc.so.6()(64bit)`` or ``python3 >= 3.6``).
     | ``kind`` — just the dependency kind tag.
-    | ``both`` — ``kind:reldep`` per entry, comma-joined.
+    | ``both`` — ``kind:dep`` per entry, comma-joined.
 
 ``--format=dot|json`` (default: ``dot``)
     | Output format. If both ``--format=dot`` and ``--json`` are
@@ -201,8 +202,8 @@ Examples
 
 ``dnf5 repograph --node-label=nevra --edge-label=both httpd``
     | Compute the closure of ``httpd``, render NEVRA-precise nodes,
-      and annotate each edge with both the dep kind and the reldep
-      string.
+      and annotate each edge with both the dep kind and the
+      dependency string.
 
 ``dnf5 repograph --resolver=or-node bash``
     | Render the closure of ``bash`` with disjunctive dependencies
@@ -249,9 +250,9 @@ Each **node** object contains:
 
 - ``unresolved`` (array, optional) — only present (and only in
   closed-universe modes: ``--closed``, ``--use-system``, and
-  ``--use-system <specs>``) when this node has reldeps with no
+  ``--use-system <specs>``) when this node has dependencies with no
   satisfier inside the closed universe. Each entry has the same
-  ``reldep`` and ``kind`` shape as in ``edges[].reldeps``. The plugin
+  ``dep`` and ``kind`` shape as in ``edges[].deps``. The plugin
   also prints a single-line summary to stderr when any unresolved
   deps were detected. (Exit code is unchanged.)
 
@@ -259,18 +260,19 @@ Each **edge** object contains:
 
 - ``from`` (string) — source node id.
 - ``to`` (string) — target node id.
-- ``reldeps`` (array) — one entry per reldep that contributes to this
-  edge. Each entry has:
+- ``deps`` (array) — one entry per dependency that contributes to
+  this edge. Each entry has:
 
-  - ``reldep`` (string) — the reldep text (e.g.
+  - ``dep`` (string) — the dependency text (e.g.
     ``libc.so.6()(64bit)`` or ``python3 >= 3.6``).
   - ``kind`` (string) — one of ``regular``, ``requires-pre``,
     ``recommends``, ``suggests``, ``supplemented-by``, ``enhanced-by``.
   - ``alt`` (boolean, optional) — ``true`` if this entry was
     selected as an alternative under ``--resolver=all``.
-  - ``skipped`` (boolean, optional) — ``true`` if this reldep was
-    skipped (currently only used for rich reverse-weak deps under
-    ``--include-reverse-weak``). ``reason`` carries an explanation.
+  - ``skipped`` (boolean, optional) — ``true`` if this dependency
+    was skipped (currently only used for rich reverse-weak deps
+    under ``--include-reverse-weak``). ``reason`` carries an
+    explanation.
 
 For an empty result the document is still well-formed; ``nodes`` and
 ``edges`` are empty arrays.

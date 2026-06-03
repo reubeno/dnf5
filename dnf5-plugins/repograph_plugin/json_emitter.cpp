@@ -57,7 +57,7 @@ json_object * build_node(const Node & n) {
         json_object * arr = json_object_new_array();
         for (const auto & u : n.unresolved) {
             json_object * jr = json_object_new_object();
-            json_object_object_add(jr, "reldep", json_object_new_string(u.reldep.c_str()));
+            json_object_object_add(jr, "dep", json_object_new_string(u.reldep.c_str()));
             json_object_object_add(jr, "kind", json_object_new_string(to_string(u.kind).c_str()));
             json_object_array_add(arr, jr);
         }
@@ -71,10 +71,10 @@ json_object * build_edge(const Edge & e) {
     json_object * j = json_object_new_object();
     json_object_object_add(j, "from", json_object_new_string(e.from.c_str()));
     json_object_object_add(j, "to", json_object_new_string(e.to.c_str()));
-    json_object * reldeps = json_object_new_array();
+    json_object * deps = json_object_new_array();
     for (const auto & rd : e.reldeps) {
         json_object * jrd = json_object_new_object();
-        json_object_object_add(jrd, "reldep", json_object_new_string(rd.reldep.c_str()));
+        json_object_object_add(jrd, "dep", json_object_new_string(rd.reldep.c_str()));
         json_object_object_add(jrd, "kind", json_object_new_string(to_string(rd.kind).c_str()));
         if (rd.alt) {
             json_object_object_add(jrd, "alt", json_object_new_boolean(true));
@@ -85,9 +85,9 @@ json_object * build_edge(const Edge & e) {
                 json_object_object_add(jrd, "reason", json_object_new_string(rd.reason.c_str()));
             }
         }
-        json_object_array_add(reldeps, jrd);
+        json_object_array_add(deps, jrd);
     }
-    json_object_object_add(j, "reldeps", reldeps);
+    json_object_object_add(j, "deps", deps);
     return j;
 }
 

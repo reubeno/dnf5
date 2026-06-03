@@ -53,7 +53,7 @@ constexpr const char * NODE_LABEL_NEVRA = "nevra";
 constexpr const char * NODE_LABEL_NAME = "name";
 
 constexpr const char * EDGE_LABEL_NONE = "none";
-constexpr const char * EDGE_LABEL_RELDEP = "reldep";
+constexpr const char * EDGE_LABEL_DEP = "dep";
 constexpr const char * EDGE_LABEL_KIND = "kind";
 constexpr const char * EDGE_LABEL_BOTH = "both";
 
@@ -105,7 +105,7 @@ repograph::NodeIdPolicy parse_node_label(const std::string & s) {
 repograph::EdgeAnnotations parse_edge_label(const std::string & s) {
     if (s == EDGE_LABEL_BOTH)
         return repograph::EdgeAnnotations::BOTH;
-    if (s == EDGE_LABEL_RELDEP)
+    if (s == EDGE_LABEL_DEP)
         return repograph::EdgeAnnotations::RELDEP;
     if (s == EDGE_LABEL_KIND)
         return repograph::EdgeAnnotations::KIND;
@@ -211,13 +211,13 @@ void RepographCommand::set_argument_parser() {
     edge_label_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
         std::make_unique<libdnf5::OptionEnum>(
             EDGE_LABEL_NONE,
-            std::vector<std::string>{EDGE_LABEL_NONE, EDGE_LABEL_RELDEP, EDGE_LABEL_KIND, EDGE_LABEL_BOTH})));
+            std::vector<std::string>{EDGE_LABEL_NONE, EDGE_LABEL_DEP, EDGE_LABEL_KIND, EDGE_LABEL_BOTH})));
     auto * edge_label_arg = parser.add_new_named_arg("edge-label");
     edge_label_arg->set_long_name("edge-label");
     edge_label_arg->set_description(
-        _("What to render on dot edge labels (default: none; JSON always contains the full reldep list)"));
+        _("What to render on dot edge labels (default: none; JSON always contains the full dependency list)"));
     edge_label_arg->set_has_value(true);
-    edge_label_arg->set_arg_value_help("none|reldep|kind|both");
+    edge_label_arg->set_arg_value_help("none|dep|kind|both");
     edge_label_arg->link_value(edge_label_option);
     cmd.register_named_arg(edge_label_arg);
 
@@ -535,8 +535,8 @@ void RepographCommand::run() {
         }
         if (total_unresolved > 0) {
             std::cerr << libdnf5::utils::sformat(
-                             _("repograph: warning: {} dependency reldeps on {} packages had no satisfier in the "
-                               "closed universe (see per-node \"unresolved\" arrays in JSON output)"),
+                             _("repograph: warning: {} unresolved dependencies on {} packages had no satisfier in "
+                               "the closed universe (see per-node \"unresolved\" arrays in JSON output)"),
                              total_unresolved,
                              nodes_with_unresolved)
                       << std::endl;
