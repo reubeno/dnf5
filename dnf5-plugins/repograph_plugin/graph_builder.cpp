@@ -41,8 +41,8 @@ BuilderConfig::BuilderConfig(const libdnf5::BaseWeakPtr & base)
 
 std::string to_string(EdgeKind kind) {
     switch (kind) {
-        case EdgeKind::REGULAR:
-            return "regular";
+        case EdgeKind::REQUIRES:
+            return "requires";
         case EdgeKind::REQUIRES_PRE:
             return "requires-pre";
         case EdgeKind::RECOMMENDS:
@@ -442,7 +442,7 @@ Graph build_graph(const BuilderConfig & cfg) {
 
         std::vector<EdgeReldep> * unresolved_out = cfg.closed_universe ? &node_it->second.unresolved : nullptr;
 
-        walk_forward(pkg, id, pkg.get_regular_requires(), EdgeKind::REGULAR, cache, cfg, edge_map, unresolved_out);
+        walk_forward(pkg, id, pkg.get_regular_requires(), EdgeKind::REQUIRES, cache, cfg, edge_map, unresolved_out);
         walk_forward(pkg, id, pkg.get_requires_pre(), EdgeKind::REQUIRES_PRE, cache, cfg, edge_map, unresolved_out);
         if (cfg.include_weak_deps) {
             walk_forward(pkg, id, pkg.get_recommends(), EdgeKind::RECOMMENDS, cache, cfg, edge_map, unresolved_out);

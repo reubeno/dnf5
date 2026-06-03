@@ -80,7 +80,7 @@ repograph::Graph make_two_node_graph() {
     e.to = "b";
     repograph::EdgeReldep rd;
     rd.reldep = "libb.so.1()(64bit)";
-    rd.kind = repograph::EdgeKind::REGULAR;
+    rd.kind = repograph::EdgeKind::REQUIRES;
     e.reldeps.push_back(rd);
 
     repograph::Graph g;
@@ -209,7 +209,7 @@ void RepographTest::test_default_markers_in_help() {
 
 
 void RepographTest::test_edge_kind_strings() {
-    CPPUNIT_ASSERT_EQUAL(std::string("regular"), repograph::to_string(repograph::EdgeKind::REGULAR));
+    CPPUNIT_ASSERT_EQUAL(std::string("requires"), repograph::to_string(repograph::EdgeKind::REQUIRES));
     CPPUNIT_ASSERT_EQUAL(std::string("requires-pre"), repograph::to_string(repograph::EdgeKind::REQUIRES_PRE));
     CPPUNIT_ASSERT_EQUAL(std::string("recommends"), repograph::to_string(repograph::EdgeKind::RECOMMENDS));
     CPPUNIT_ASSERT_EQUAL(std::string("suggests"), repograph::to_string(repograph::EdgeKind::SUGGESTS));
@@ -236,7 +236,7 @@ void RepographTest::test_dot_emit_simple() {
     CPPUNIT_ASSERT(s.find("\"a\";") != std::string::npos);
     CPPUNIT_ASSERT(s.find("\"b\";") != std::string::npos);
     CPPUNIT_ASSERT(s.find("\"a\" -> \"b\"") != std::string::npos);
-    CPPUNIT_ASSERT(s.find("regular:libb.so.1") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("requires:libb.so.1") != std::string::npos);
 }
 
 
@@ -262,14 +262,14 @@ void RepographTest::test_dot_emit_annotations_modes() {
     };
 
     std::string both = render(repograph::EdgeAnnotations::BOTH);
-    CPPUNIT_ASSERT(both.find("regular:libb.so.1") != std::string::npos);
+    CPPUNIT_ASSERT(both.find("requires:libb.so.1") != std::string::npos);
 
     std::string reldep_only = render(repograph::EdgeAnnotations::RELDEP);
     CPPUNIT_ASSERT(reldep_only.find("libb.so.1") != std::string::npos);
-    CPPUNIT_ASSERT(reldep_only.find("regular:") == std::string::npos);
+    CPPUNIT_ASSERT(reldep_only.find("requires:") == std::string::npos);
 
     std::string kind_only = render(repograph::EdgeAnnotations::KIND);
-    CPPUNIT_ASSERT(kind_only.find("label=\"regular\"") != std::string::npos);
+    CPPUNIT_ASSERT(kind_only.find("label=\"requires\"") != std::string::npos);
     CPPUNIT_ASSERT(kind_only.find("libb.so.1") == std::string::npos);
 
     std::string none = render(repograph::EdgeAnnotations::NONE);
@@ -342,10 +342,10 @@ void RepographTest::test_json_emit_includes_unresolved() {
 
     repograph::EdgeReldep u1;
     u1.reldep = "libc.so.6()(64bit)";
-    u1.kind = repograph::EdgeKind::REGULAR;
+    u1.kind = repograph::EdgeKind::REQUIRES;
     repograph::EdgeReldep u2;
     u2.reldep = "libtinfo.so.6()(64bit)";
-    u2.kind = repograph::EdgeKind::REGULAR;
+    u2.kind = repograph::EdgeKind::REQUIRES;
     n.unresolved = {u1, u2};
 
     g.nodes.push_back(n);

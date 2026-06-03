@@ -43,7 +43,7 @@ document. It is the dnf5 successor to the dnf4 ``repograph`` /
   *root* package specs, restrict the universe to an explicit set of
   packages, or analyze the dependency graph *within* the set of
   currently installed packages.
-* Full per-dependency edge data distinguishing regular requires,
+* Full per-dependency edge data distinguishing ``Requires``,
   ``Requires(pre)``, ``Recommends``, ``Suggests``, and (with
   ``--include-reverse-weak``) ``Supplements``/``Enhances``.
 * Honors the dnf5 ``install_weak_deps`` configuration option (so
@@ -265,7 +265,7 @@ Each **edge** object contains:
 
   - ``dep`` (string) — the dependency text (e.g.
     ``libc.so.6()(64bit)`` or ``python3 >= 3.6``).
-  - ``kind`` (string) — one of ``regular``, ``requires-pre``,
+  - ``kind`` (string) — one of ``requires``, ``requires-pre``,
     ``recommends``, ``suggests``, ``supplemented-by``, ``enhanced-by``.
   - ``alt`` (boolean, optional) — ``true`` if this entry was
     selected as an alternative under ``--resolver=all``.

@@ -38,7 +38,7 @@ namespace dnf5::repograph {
 
 /// Reason for an edge between two packages.
 enum class EdgeKind {
-    REGULAR,           ///< From `Requires` (non-pre)
+    REQUIRES,          ///< From `Requires` (non-pre)
     REQUIRES_PRE,      ///< From `Requires(pre)`
     RECOMMENDS,        ///< From `Recommends` (weak)
     SUGGESTS,          ///< From `Suggests` (weak)
