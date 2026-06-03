@@ -221,6 +221,18 @@ void RepographCommand::set_argument_parser() {
     edge_label_arg->link_value(edge_label_option);
     cmd.register_named_arg(edge_label_arg);
 
+    edge_label_limit_option = dynamic_cast<libdnf5::OptionNumber<std::int32_t> *>(parser.add_init_value(
+        std::make_unique<libdnf5::OptionNumber<std::int32_t>>(5, 0, INT32_MAX)));
+    auto * edge_label_limit_arg = parser.add_new_named_arg("edge-label-limit");
+    edge_label_limit_arg->set_long_name("edge-label-limit");
+    edge_label_limit_arg->set_description(
+        _("Maximum number of dependency entries to render per dot edge label; further entries are summarized as "
+          "\"...and N more\" (default: 5; 0 = unlimited)"));
+    edge_label_limit_arg->set_has_value(true);
+    edge_label_limit_arg->set_arg_value_help("N");
+    edge_label_limit_arg->link_value(edge_label_limit_option);
+    cmd.register_named_arg(edge_label_limit_arg);
+
     format_option = dynamic_cast<libdnf5::OptionEnum *>(parser.add_init_value(
         std::make_unique<libdnf5::OptionEnum>(FORMAT_DOT, std::vector<std::string>{FORMAT_DOT, FORMAT_JSON})));
     auto * format_arg = parser.add_new_named_arg("format");
@@ -292,6 +304,7 @@ void RepographCommand::configure() {
     resolver = parse_resolver(resolver_option->get_value());
     node_label_policy = parse_node_label(node_label_option->get_value());
     edge_label = parse_edge_label(edge_label_option->get_value());
+    edge_label_limit = static_cast<size_t>(edge_label_limit_option->get_value());
     include_reverse_weak = include_reverse_weak_option->get_value();
     include_weak_deps = ctx.get_base().get_config().get_install_weak_deps_option().get_value();
     output_path = output_option->get_value();
@@ -562,7 +575,7 @@ void RepographCommand::run() {
             node_label_option->get_value(),
             resolver_option->get_value());
     } else {
-        repograph::emit_dot(*out, graph, edge_label);
+        repograph::emit_dot(*out, graph, edge_label, edge_label_limit);
     }
 }
 

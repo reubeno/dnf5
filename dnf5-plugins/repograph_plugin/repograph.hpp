@@ -29,8 +29,10 @@
 #include <libdnf5-cli/session.hpp>
 #include <libdnf5/conf/option_bool.hpp>
 #include <libdnf5/conf/option_enum.hpp>
+#include <libdnf5/conf/option_number.hpp>
 #include <libdnf5/conf/option_path.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -80,6 +82,7 @@ private:
     repograph::ProviderPolicy resolver{repograph::ProviderPolicy::SOLVER};
     repograph::NodeIdPolicy node_label_policy{repograph::NodeIdPolicy::NAME};
     repograph::EdgeAnnotations edge_label{repograph::EdgeAnnotations::NONE};
+    size_t edge_label_limit{5};
     bool include_reverse_weak{false};
     bool include_weak_deps{true};
     std::string output_path;
@@ -92,6 +95,7 @@ private:
     libdnf5::OptionEnum * resolver_option{nullptr};
     libdnf5::OptionEnum * node_label_option{nullptr};
     libdnf5::OptionEnum * edge_label_option{nullptr};
+    libdnf5::OptionNumber<std::int32_t> * edge_label_limit_option{nullptr};
     libdnf5::OptionEnum * format_option{nullptr};
     libdnf5::OptionPath * output_option{nullptr};
 };

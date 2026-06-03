@@ -153,7 +153,16 @@ Defaults are noted inline. All flags also appear in ``dnf5 repograph
     | ``dep`` — just the dependency string (e.g.
       ``libc.so.6()(64bit)`` or ``python3 >= 3.6``).
     | ``kind`` — just the dependency kind tag.
-    | ``both`` — ``kind:dep`` per entry, comma-joined.
+    | ``both`` — ``kind:dep`` per entry.
+    | Multiple entries on the same edge are rendered one per line
+      (left-aligned). See ``--edge-label-limit`` to cap long labels.
+
+``--edge-label-limit=N`` (default: ``5``)
+    | When more than ``N`` dependency entries would appear on a
+      single dot edge, only the first ``N - 1`` are shown and the
+      rest are summarized as ``...and X more``. A value of ``0``
+      disables the cap and renders every entry. Affects dot output
+      only; JSON always carries the full list.
 
 ``--format=dot|json`` (default: ``dot``)
     | Output format. If both ``--format=dot`` and ``--json`` are

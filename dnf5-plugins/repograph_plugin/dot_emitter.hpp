@@ -31,7 +31,13 @@ namespace dnf5::repograph {
 
 
 /// Stream the graph as a Graphviz dot document to `out`.
-void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations);
+///
+/// Edge labels are rendered multi-line (one dependency per line,
+/// left-aligned). When the total number of entries on an edge exceeds
+/// `edge_label_limit`, only the first `edge_label_limit - 1` are shown
+/// followed by a summary line ("...and N more"). A value of 0 disables
+/// the limit and renders every entry.
+void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations, size_t edge_label_limit = 0);
 
 
 }  // namespace dnf5::repograph

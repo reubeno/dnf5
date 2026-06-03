@@ -44,32 +44,60 @@ std::string quote(const std::string & s) {
 }
 
 
-std::string render_edge_label(const Edge & edge, EdgeAnnotations annotations) {
+std::string render_entry(const EdgeReldep & rd, EdgeAnnotations annotations) {
+    switch (annotations) {
+        case EdgeAnnotations::BOTH:
+            return to_string(rd.kind) + ":" + rd.reldep;
+        case EdgeAnnotations::RELDEP:
+            return rd.reldep;
+        case EdgeAnnotations::KIND:
+            return to_string(rd.kind);
+        case EdgeAnnotations::NONE:
+            return {};
+    }
+    return {};
+}
+
+
+/// Escape characters that Graphviz dot interprets inside a quoted label.
+/// In particular `\` introduces escapes (`\l`, `\n`, `\r`, `\N`, etc.),
+/// so each literal backslash and double-quote in user-supplied text
+/// must be escaped. We deliberately *do not* escape `\l` sequences we
+/// add ourselves for line breaks; this function is only applied to
+/// individual entry strings.
+std::string escape_label_text(const std::string & s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        if (c == '\\' || c == '"') {
+            out.push_back('\\');
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
+
+std::string render_edge_label(const Edge & edge, EdgeAnnotations annotations, size_t limit) {
     if (annotations == EdgeAnnotations::NONE || edge.reldeps.empty()) {
         return {};
     }
+    const size_t total = edge.reldeps.size();
+    const bool capped = limit > 0 && total > limit;
+    // When capping, reserve the last visible slot for the "...and N more" line.
+    const size_t to_render = capped ? limit - 1 : total;
+
     std::string label;
-    bool first = true;
-    for (const auto & rd : edge.reldeps) {
-        if (!first) {
-            label.append(", ");
-        }
-        first = false;
-        switch (annotations) {
-            case EdgeAnnotations::BOTH:
-                label.append(to_string(rd.kind));
-                label.append(":");
-                label.append(rd.reldep);
-                break;
-            case EdgeAnnotations::RELDEP:
-                label.append(rd.reldep);
-                break;
-            case EdgeAnnotations::KIND:
-                label.append(to_string(rd.kind));
-                break;
-            case EdgeAnnotations::NONE:
-                break;
-        }
+    for (size_t i = 0; i < to_render; ++i) {
+        label.append(escape_label_text(render_entry(edge.reldeps[i], annotations)));
+        // Graphviz `\l` is a left-aligned newline; using it for every
+        // line (including the last) keeps the whole block flush-left.
+        label.append("\\l");
+    }
+    if (capped) {
+        label.append("\\l...and ");
+        label.append(std::to_string(total - to_render));
+        label.append(" more\\l");
     }
     return label;
 }
@@ -78,16 +106,18 @@ std::string render_edge_label(const Edge & edge, EdgeAnnotations annotations) {
 }  // namespace
 
 
-void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations) {
+void emit_dot(std::ostream & out, const Graph & graph, EdgeAnnotations annotations, size_t edge_label_limit) {
     out << "digraph packages {\n";
     for (const auto & n : graph.nodes) {
         out << "    " << quote(n.id) << ";\n";
     }
     for (const auto & e : graph.edges) {
         out << "    " << quote(e.from) << " -> " << quote(e.to);
-        std::string label = render_edge_label(e, annotations);
+        std::string label = render_edge_label(e, annotations, edge_label_limit);
         if (!label.empty()) {
-            out << " [label=" << quote(label) << "]";
+            // The label is already escape-safe and contains pre-formed
+            // `\l` line breaks; wrap in quotes without further escaping.
+            out << " [label=\"" << label << "\"]";
         }
         out << ";\n";
     }

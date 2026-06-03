@@ -108,6 +108,7 @@ void RepographTest::test_all_options_registered() {
     (void)cp.get_named_arg("resolver");
     (void)cp.get_named_arg("node-label");
     (void)cp.get_named_arg("edge-label");
+    (void)cp.get_named_arg("edge-label-limit");
     (void)cp.get_named_arg("format");
     (void)cp.get_named_arg("output");
     (void)cp.get_named_arg("json");
@@ -163,6 +164,15 @@ void RepographTest::test_edge_label_option() {
     auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-label");
     CPPUNIT_ASSERT_EQUAL(std::string("edge-label"), arg.get_long_name());
     CPPUNIT_ASSERT(arg.get_has_value());
+}
+
+
+void RepographTest::test_edge_label_limit_option() {
+    Fixture f;
+    auto & arg = f.cmd->get_argument_parser_command()->get_named_arg("edge-label-limit");
+    CPPUNIT_ASSERT_EQUAL(std::string("edge-label-limit"), arg.get_long_name());
+    CPPUNIT_ASSERT(arg.get_has_value());
+    CPPUNIT_ASSERT(arg.get_description().find("default: 5") != std::string::npos);
 }
 
 
@@ -269,11 +279,83 @@ void RepographTest::test_dot_emit_annotations_modes() {
     CPPUNIT_ASSERT(reldep_only.find("requires:") == std::string::npos);
 
     std::string kind_only = render(repograph::EdgeAnnotations::KIND);
-    CPPUNIT_ASSERT(kind_only.find("label=\"requires\"") != std::string::npos);
+    CPPUNIT_ASSERT(kind_only.find("label=\"requires") != std::string::npos);
     CPPUNIT_ASSERT(kind_only.find("libb.so.1") == std::string::npos);
 
     std::string none = render(repograph::EdgeAnnotations::NONE);
     CPPUNIT_ASSERT(none.find("label=") == std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_multiline_labels() {
+    // Build an edge with three dep entries; verify each ends with the
+    // Graphviz left-aligned-newline escape `\l` instead of being
+    // comma-joined on a single line.
+    repograph::Graph g;
+    repograph::Node a;
+    a.id = "a";
+    repograph::Node b;
+    b.id = "b";
+    g.nodes = {a, b};
+    repograph::Edge e;
+    e.from = "a";
+    e.to = "b";
+    for (const auto * dep : {"libfoo.so.1()(64bit)", "libfoo.so.1(FOO_1.0)(64bit)", "libfoo.so.1(FOO_2.0)(64bit)"}) {
+        repograph::EdgeReldep rd;
+        rd.reldep = dep;
+        rd.kind = repograph::EdgeKind::REQUIRES;
+        e.reldeps.push_back(rd);
+    }
+    g.edges = {e};
+
+    std::ostringstream out;
+    repograph::emit_dot(out, g, repograph::EdgeAnnotations::BOTH);
+    std::string s = out.str();
+    // Each entry ends with \l (literal backslash-l in the dot source).
+    size_t count = 0;
+    for (size_t pos = 0; (pos = s.find("\\l", pos)) != std::string::npos; ++pos) {
+        ++count;
+    }
+    CPPUNIT_ASSERT(count >= 3);
+    // No comma-joined fallback.
+    CPPUNIT_ASSERT(s.find(", requires:") == std::string::npos);
+}
+
+
+void RepographTest::test_dot_emit_label_limit() {
+    // Build an edge with 10 entries; verify that limit=3 shows the
+    // first 2 entries plus an "...and 8 more" summary line.
+    repograph::Graph g;
+    repograph::Node a;
+    a.id = "a";
+    repograph::Node b;
+    b.id = "b";
+    g.nodes = {a, b};
+    repograph::Edge e;
+    e.from = "a";
+    e.to = "b";
+    for (int i = 0; i < 10; ++i) {
+        repograph::EdgeReldep rd;
+        rd.reldep = "dep" + std::to_string(i);
+        rd.kind = repograph::EdgeKind::REQUIRES;
+        e.reldeps.push_back(rd);
+    }
+    g.edges = {e};
+
+    std::ostringstream out;
+    repograph::emit_dot(out, g, repograph::EdgeAnnotations::BOTH, /*edge_label_limit=*/3);
+    std::string s = out.str();
+    CPPUNIT_ASSERT(s.find("dep0") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("dep1") != std::string::npos);
+    CPPUNIT_ASSERT(s.find("dep2") == std::string::npos);
+    CPPUNIT_ASSERT(s.find("...and 8 more") != std::string::npos);
+
+    // limit=0 means unlimited; all entries should be present.
+    std::ostringstream out0;
+    repograph::emit_dot(out0, g, repograph::EdgeAnnotations::BOTH, /*edge_label_limit=*/0);
+    std::string s0 = out0.str();
+    CPPUNIT_ASSERT(s0.find("dep9") != std::string::npos);
+    CPPUNIT_ASSERT(s0.find("more") == std::string::npos);
 }
 
 

@@ -32,6 +32,7 @@ class RepographTest : public CppUnit::TestCase {
     CPPUNIT_TEST(test_resolver_option);
     CPPUNIT_TEST(test_node_label_option);
     CPPUNIT_TEST(test_edge_label_option);
+    CPPUNIT_TEST(test_edge_label_limit_option);
     CPPUNIT_TEST(test_format_option);
     CPPUNIT_TEST(test_output_option);
     CPPUNIT_TEST(test_json_option);
@@ -42,6 +43,8 @@ class RepographTest : public CppUnit::TestCase {
     CPPUNIT_TEST(test_dot_emit_simple);
     CPPUNIT_TEST(test_dot_emit_quoting);
     CPPUNIT_TEST(test_dot_emit_annotations_modes);
+    CPPUNIT_TEST(test_dot_emit_multiline_labels);
+    CPPUNIT_TEST(test_dot_emit_label_limit);
     CPPUNIT_TEST(test_json_emit_empty);
     CPPUNIT_TEST(test_json_emit_simple);
     CPPUNIT_TEST(test_json_emit_includes_members);
@@ -59,6 +62,7 @@ public:
     void test_resolver_option();
     void test_node_label_option();
     void test_edge_label_option();
+    void test_edge_label_limit_option();
     void test_format_option();
     void test_output_option();
     void test_json_option();
@@ -69,6 +73,8 @@ public:
     void test_dot_emit_simple();
     void test_dot_emit_quoting();
     void test_dot_emit_annotations_modes();
+    void test_dot_emit_multiline_labels();
+    void test_dot_emit_label_limit();
     void test_json_emit_empty();
     void test_json_emit_simple();
     void test_json_emit_includes_members();
