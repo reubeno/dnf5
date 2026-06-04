@@ -1,0 +1,57 @@
+=Ver: 3.0
+
+# Test repository for repograph integration tests. Designed to exercise:
+#  - Strong, recommended, and suggested dependencies
+#  - Multiple providers per reldep (alternates for libb-runtime)
+#  - A self-provider with an alternative provider
+#  - Package-name merging (two arches of liba)
+#  - Unresolved dependencies (app -> optional-pkg has no provider)
+
+# Root package with strong, virtual, weak, and unresolved dependencies.
+=Pkg: app 1.0 1 x86_64
+=Prv: app = 1.0-1
+=Req: liba.so.1()(64bit)
+=Req: libb-runtime
+=Rec: bonus
+=Sug: suggestion
+=Req: optional-pkg
+
+# Unique provider for liba.so.1()(64bit) -- the x86_64 build provides the
+# (64bit) marker, the i686 build provides only the bare soname. This
+# lets us prove that node merging by name collapses both arches into a
+# single "liba" node.
+=Pkg: liba 1.2 1 x86_64
+=Prv: liba.so.1()(64bit)
+=Prv: liba = 1.2-1
+
+=Pkg: liba 1.2 1 i686
+=Prv: liba.so.1
+=Prv: liba = 1.2-1
+
+# Two packages provide libb-runtime; the graph selects one provider.
+=Pkg: libb-impl1 1.0 1 x86_64
+=Prv: libb-runtime = 1.0-1
+=Prv: libb-impl1 = 1.0-1
+
+=Pkg: libb-impl2 1.0 1 x86_64
+=Prv: libb-runtime = 1.0-1
+=Prv: libb-impl2 = 1.0-1
+
+# Recommended package. Included only when include_recommends is true.
+=Pkg: bonus 1.0 1 x86_64
+=Prv: bonus = 1.0-1
+
+# Suggested package. Suggests are hints and do not produce graph edges.
+=Pkg: suggestion 1.0 1 x86_64
+=Prv: suggestion = 1.0-1
+
+# The requiring package also provides shared-capability. The graph skips
+# self-edges and selects the alternative provider.
+=Pkg: self-provider 1.0 1 x86_64
+=Prv: self-provider = 1.0-1
+=Prv: shared-capability
+=Req: shared-capability
+
+=Pkg: alternative-provider 1.0 1 x86_64
+=Prv: alternative-provider = 1.0-1
+=Prv: shared-capability

@@ -174,6 +174,9 @@ These are available after installing the ``dnf5-plugins`` package.
 :ref:`repoclosure <repoclosure_plugin_ref-label>`
     | Display a list of unresolved dependencies for repositories.
 
+:ref:`repograph <repograph_plugin_ref-label>`
+    | Output a package dependency graph in dot format.
+
 :ref:`reposync <reposync_plugin_ref-label>`
     | Synchronize packages and metadata of a remote DNF repository to a local directory.
 
@@ -524,6 +527,7 @@ Application Plugins:
     | :manpage:`dnf5-copr(8)`, :ref:`Copr command <copr_plugin_ref-label>`
     | :manpage:`dnf5-needs-restarting(8)`, :ref:`Needs-Restarting command <needs_restarting_plugin_ref-label>`
     | :manpage:`dnf5-repoclosure(8)`, :ref:`Repoclosure command <repoclosure_plugin_ref-label>`
+    | :manpage:`dnf5-repograph(8)`, :ref:`Repograph command <repograph_plugin_ref-label>`
     | :manpage:`dnf5-repomanage(8)`, :ref:`Repomanage command <repomanage_plugin_ref-label>`
     | :manpage:`dnf5-reposync(8)`, :ref:`Reposync command <reposync_plugin_ref-label>`
 

@@ -16,6 +16,7 @@ DNF5 Plugins
     manifest.8
     needs_restarting.8
     repoclosure.8
+    repograph.8
     repomanage.8
     reposync.8
 
