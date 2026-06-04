@@ -1,0 +1,16 @@
+=Ver: 3.0
+
+# Only the newer build satisfies its own dependency. Name merging must
+# not hide the older build's dependency on the external provider.
+=Pkg: a-source 1.0 1 noarch
+=Prv: api = 1
+=Req: api >= 2
+=Rec: api >= 2
+
+=Pkg: a-source 2.0 1 noarch
+=Prv: api = 2
+=Req: api >= 2
+=Rec: api >= 2
+
+=Pkg: z-provider 2.0 1 noarch
+=Prv: api = 2

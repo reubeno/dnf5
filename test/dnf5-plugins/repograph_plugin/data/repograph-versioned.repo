@@ -1,0 +1,21 @@
+=Ver: 3.0
+
+# Only the lexically last provider satisfies api >= 2; none satisfies api >= 3.
+=Pkg: a-old-provider 1.0 1 noarch
+=Prv: api = 1
+
+=Pkg: z-new-provider 2.0 1 noarch
+=Prv: api = 2
+
+=Pkg: consumer-a 1.0 1 noarch
+=Req: api >= 2
+=Req: absent-capability
+
+=Pkg: consumer-b 1.0 1 noarch
+=Req: api >= 3
+=Req: absent-capability
+
+=Pkg: consumer-c 1.0 1 noarch
+=Req: api >= 2
+=Req: api >= 3
+=Req: absent-capability

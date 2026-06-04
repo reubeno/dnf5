@@ -1,0 +1,20 @@
+=Ver: 3.0
+
+# The smallest provider name occurs three times. Each build satisfies
+# its own dependency and must not gain an edge to an alternative provider.
+=Pkg: a-provider 1.0 1 x86_64
+=Prv: shared-capability
+=Req: shared-capability
+
+=Pkg: a-provider 1.0 1 i686
+=Prv: shared-capability
+=Req: shared-capability
+
+=Pkg: a-provider 2.0 1 x86_64
+=Prv: shared-capability
+=Req: shared-capability
+
+# Recommends shares the same cache entry as Requires.
+=Pkg: m-consumer 1.0 1 noarch
+=Req: shared-capability
+=Rec: shared-capability

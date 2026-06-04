@@ -1,0 +1,30 @@
+=Ver: 3.0
+
+# Libsolv testtags uses "&" and "<IF>", not RPM's "and" and "if" spellings.
+=Pkg: and-consumer-a 1.0 1 noarch
+=Req: rich-left & rich-right
+
+=Pkg: and-consumer-b 1.0 1 noarch
+=Req: rich-left & rich-right
+
+=Pkg: conditional-consumer-a 1.0 1 noarch
+=Req: rich-left <IF> rich-condition
+
+=Pkg: conditional-consumer-b 1.0 1 noarch
+=Req: rich-left <IF> rich-condition
+
+=Pkg: rich-recommender 1.0 1 noarch
+=Rec: rich-left & rich-right
+=Rec: rich-left <IF> rich-condition
+
+=Pkg: rich-suggester 1.0 1 noarch
+=Sug: rich-left & rich-right
+
+=Pkg: rich-left 1.0 1 noarch
+=Prv: rich-left
+
+=Pkg: rich-right 1.0 1 noarch
+=Prv: rich-right
+
+=Pkg: rich-condition 1.0 1 noarch
+=Prv: rich-condition

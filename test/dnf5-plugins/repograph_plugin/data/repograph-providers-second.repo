@@ -1,0 +1,10 @@
+=Ver: 3.0
+
+# Deliberately load the larger alternate first.
+=Pkg: z-provider 1.0 1 noarch
+=Prv: shared-capability
+=Req: shared-capability
+
+=Pkg: b-provider 1.0 1 noarch
+=Prv: shared-capability
+=Req: shared-capability

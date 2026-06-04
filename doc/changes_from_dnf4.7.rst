@@ -288,6 +288,14 @@ Changes to individual commands
 ``repoclosure``
   * Dropped ``--pkg`` option. Positional arguments can now be used to specify packages to check closure for.
 
+``repograph``
+  * Available in the ``dnf5-plugins`` package, including the ``repo-graph`` alias.
+  * With no package specifications, includes all available package names, including packages without dependency edges. Dependencies from multiple versions and architectures of the same name are merged.
+  * Positional package specifications select a hypothetical installation and its dependencies using the solver, without using installed packages or installing anything.
+  * Unlike DNF4, includes ``Recommends`` edges by default. Use ``--setopt=install_weak_deps=false`` for ``Requires`` edges only; in scoped mode this also prevents selection of weak dependencies, including ``Supplements``.
+  * Dependencies satisfied by the requiring package itself produce no edge. Other dependencies use a deterministic, lexicographically first external provider name, not necessarily the solver's installation reason.
+  * DOT formatting has changed, including removal of dependency-count-based coloring. Rich-dependency edges remain approximate; a warning is printed to standard error when they are encountered.
+
 ``repository-packages``
   * Dropped. The functionality is covered by existing commands combined with the ``--repo``, ``--disable-repo`` global options and the new ``--from-repo`` and ``--installed-from-repo`` options.
 
